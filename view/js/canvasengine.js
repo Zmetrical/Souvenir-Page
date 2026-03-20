@@ -7,34 +7,75 @@ export class CanvasEngine {
     };
   }
 
-  // Calculate coordinates for beads along a path
-  getPositions(product, count) {
+  // Calculate coordinates for beads packed tightly together
+  getPositions(state) {
+    const elems = state.elems;
+    const count = elems.length;
     if (!count) return [];
-    if (product === 'bracelet') {
+
+    // Calculate physical radius for every bead (+1px for a tiny natural gap)
+    const radii = elems.map(el => (el.small ? 14 : (el.large ? 28 : 22)) + 1);
+
+    // 1. FLATLAY (Straight horizontal line packed from the center)
+    if (state.view === 'flatlay') {
+      const totalWidth = radii.reduce((sum, r) => sum + r * 2, 0);
+      let currentX = 340 - (totalWidth / 2) + radii[0];
+      const y = 240;
+      
+      return elems.map((el, i) => {
+        const pos = { x: currentX, y: y, angle: 90 };
+        if (i < count - 1) currentX += radii[i] + radii[i+1];
+        return pos;
+      });
+    }
+
+    // 2. BRACELET (Packed tightly at the bottom center of the ellipse)
+    if (state.product === 'bracelet') {
       const { cx, cy, rx, ry } = this.PATHS.bracelet;
-      return Array.from({ length: count }, (_, i) => {
-        const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
-        return { 
-          x: cx + rx * Math.cos(angle), 
-          y: cy + ry * Math.sin(angle), 
-          angle: angle * 180 / Math.PI + 90 
+      
+      // Calculate angular width needed for all beads combined
+      const angles = radii.map(r => (r * 2) / rx);
+      const totalAngle = angles.reduce((sum, a) => sum + a, 0);
+      
+      // Start from the bottom (PI/2) and shift left by half the total width
+      let currentT = (Math.PI / 2) - (totalAngle / 2) + (angles[0] / 2); 
+      
+      return elems.map((el, i) => {
+        const pos = { 
+          x: cx + rx * Math.cos(currentT), 
+          y: cy + ry * Math.sin(currentT), 
+          angle: currentT * 180 / Math.PI + 90 
         };
+        if (i < count - 1) currentT += (angles[i] / 2) + (angles[i+1] / 2);
+        return pos;
       });
     }
-    if (product === 'necklace') {
-      return Array.from({ length: count }, (_, i) => {
-        const t = count === 1 ? 0.5 : i / (count - 1);
-        const { x, y, dx, dy } = this.bezierPoint(60, 80, 60, 420, 620, 420, 620, 80, t);
-        return { x, y, angle: Math.atan2(dy, dx) * 180 / Math.PI };
+
+    // 3. NECKLACE (Packed tightly at the bottom center of the bezier curve)
+    if (state.product === 'necklace') {
+      const approxLength = 800; // rough pixel length of the bezier curve
+      const totalWidth = radii.reduce((sum, r) => sum + r * 2, 0);
+      let currentT = 0.5 - (totalWidth / approxLength / 2);
+      
+      return elems.map((el, i) => {
+        const { x, y, dx, dy } = this.bezierPoint(60, 80, 60, 420, 620, 420, 620, 80, currentT);
+        const pos = { x, y, angle: Math.atan2(dy, dx) * 180 / Math.PI };
+        if (i < count - 1) currentT += (radii[i] + radii[i+1]) / approxLength;
+        return pos;
       });
     }
-    if (product === 'keychain') {
-      const startY = 190, endY = 430, x = 340;
-      return Array.from({ length: count }, (_, i) => {
-        const t = count === 1 ? 0.5 : i / (count - 1);
-        return { x, y: startY + (endY - startY) * t, angle: 90 };
+
+    // 4. KEYCHAIN (Packed tightly going downwards)
+    if (state.product === 'keychain') {
+      let currentY = 190 + radii[0];
+      const x = 340;
+      return elems.map((el, i) => {
+        const pos = { x, y: currentY, angle: 90 };
+        if (i < count - 1) currentY += radii[i] + radii[i+1];
+        return pos;
       });
     }
+    
     return [];
   }
 
@@ -73,7 +114,7 @@ export class CanvasEngine {
     // String Guide
     ctx.save();
     ctx.strokeStyle = 'rgba(17,17,24,.15)'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
-    this.drawProductPath(ctx, state.product); ctx.stroke();
+    this.drawProductPath(ctx, state); ctx.stroke();
     ctx.setLineDash([]); ctx.restore();
 
     // String Render
@@ -81,18 +122,18 @@ export class CanvasEngine {
       ctx.save();
       if (flat) {
         ctx.translate(4, 4);
-        this.drawString(ctx, state.product, state.strType, state.strColor, true);
+        this.drawString(ctx, state, true);
         ctx.translate(-4, -4);
       }
-      this.drawString(ctx, state.product, state.strType, state.strColor, false);
+      this.drawString(ctx, state, false);
       ctx.restore();
     }
 
-    this.drawClasp(ctx, state.product, state.clasp, state.strColor);
+    if (!flat) this.drawClasp(ctx, state.product, state.clasp, state.strColor);
 
     // Beads Render
     if (state.elems.length) {
-      const positions = this.getPositions(state.product, state.elems.length);
+      const positions = this.getPositions(state);
       for (let i = 0; i < state.elems.length; i++) {
         const el = state.elems[i];
         const pos = positions[i] || { x: W / 2, y: H / 2, angle: 0 };
@@ -101,16 +142,19 @@ export class CanvasEngine {
 
         ctx.save();
         ctx.translate(pos.x, pos.y);
+        
         if (el.category === 'beads' || el.isLetter) {
           ctx.rotate(pos.angle * Math.PI / 180);
         }
-        this.drawBrutalistElement(ctx, el, R, isSelected, false);
+        
+        // Pass pos.angle so we can counter-rotate the text letters
+        this.drawBrutalistElement(ctx, el, R, isSelected, false, pos.angle);
         ctx.restore();
       }
     }
 
     // Keychain ring overlay
-    if (state.product === 'keychain') {
+    if (state.product === 'keychain' && !flat) {
       ctx.save(); ctx.strokeStyle = '#111118'; ctx.lineWidth = 6;
       ctx.translate(3, 3); ctx.beginPath(); ctx.arc(340, 130, 42, 0, Math.PI * 2); ctx.stroke();
       ctx.translate(-3, -3); ctx.strokeStyle = '#E0E0E0'; ctx.stroke();
@@ -119,47 +163,47 @@ export class CanvasEngine {
     }
   }
 
-  drawString(ctx, product, type, color, isShadow) {
+  drawString(ctx, state, isShadow) {
     ctx.save();
     ctx.lineJoin = 'round';
-    const drawPath = () => { this.drawProductPath(ctx, product); };
+    const drawPath = () => { this.drawProductPath(ctx, state); };
 
-    if (type === 'Elastic') {
+    if (state.strType === 'Elastic') {
       ctx.lineCap = 'round';
       if (isShadow) {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; drawPath(); ctx.stroke();
       } else {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; drawPath(); ctx.stroke();
-        ctx.strokeStyle = color; ctx.lineWidth = 4; drawPath(); ctx.stroke();
+        ctx.strokeStyle = state.strColor; ctx.lineWidth = 4; drawPath(); ctx.stroke();
       }
-    } else if (type === 'Cord') {
+    } else if (state.strType === 'Cord') {
       ctx.lineCap = 'butt';
       if (isShadow) {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 8; drawPath(); ctx.stroke();
       } else {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 8; drawPath(); ctx.stroke();
-        ctx.strokeStyle = color; ctx.lineWidth = 6; drawPath(); ctx.stroke();
+        ctx.strokeStyle = state.strColor; ctx.lineWidth = 6; drawPath(); ctx.stroke();
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; ctx.setLineDash([4, 8]); drawPath(); ctx.stroke();
       }
-    } else if (type === 'Wire') {
+    } else if (state.strType === 'Wire') {
       ctx.lineCap = 'round';
       if (isShadow) {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 4; drawPath(); ctx.stroke();
       } else {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 4; drawPath(); ctx.stroke();
-        ctx.strokeStyle = color; ctx.lineWidth = 2; drawPath(); ctx.stroke();
+        ctx.strokeStyle = state.strColor; ctx.lineWidth = 2; drawPath(); ctx.stroke();
       }
-    } else if (type === 'Chain') {
+    } else if (state.strType === 'Chain') {
       ctx.lineCap = 'round';
       if (isShadow) {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 12; ctx.setLineDash([0, 18]); drawPath(); ctx.stroke();
         ctx.lineWidth = 6; ctx.setLineDash([]); drawPath(); ctx.stroke();
       } else {
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; ctx.setLineDash([]); drawPath(); ctx.stroke();
-        ctx.strokeStyle = color; ctx.lineWidth = 2; drawPath(); ctx.stroke();
+        ctx.strokeStyle = state.strColor; ctx.lineWidth = 2; drawPath(); ctx.stroke();
         
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 12; ctx.setLineDash([0, 18]); drawPath(); ctx.stroke();
-        ctx.strokeStyle = color; ctx.lineWidth = 8; drawPath(); ctx.stroke();
+        ctx.strokeStyle = state.strColor; ctx.lineWidth = 8; drawPath(); ctx.stroke();
         
         ctx.strokeStyle = '#111118'; ctx.lineWidth = 3; drawPath(); ctx.stroke();
       }
@@ -167,11 +211,16 @@ export class CanvasEngine {
     ctx.restore();
   }
 
-  drawProductPath(ctx, product) {
-    if (product === 'bracelet') {
+  drawProductPath(ctx, state) {
+    if (state.view === 'flatlay') {
+      ctx.beginPath(); ctx.moveTo(80, 240); ctx.lineTo(600, 240);
+      return;
+    }
+
+    if (state.product === 'bracelet') {
       const { cx, cy, rx, ry } = this.PATHS.bracelet;
       ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    } else if (product === 'necklace') {
+    } else if (state.product === 'necklace') {
       ctx.beginPath(); ctx.moveTo(60, 80); ctx.bezierCurveTo(60, 420, 620, 420, 620, 80);
     } else {
       ctx.beginPath(); ctx.moveTo(340, 190); ctx.lineTo(340, 430);
@@ -214,7 +263,7 @@ export class CanvasEngine {
     ctx.beginPath(); pathFunc(ctx, R); ctx.fill(); ctx.stroke();
   }
 
-  drawBrutalistElement(ctx, el, R, isSelected, isThumb = false) {
+  drawBrutalistElement(ctx, el, R, isSelected, isThumb = false, posAngle = 0) {
     const color = el.color || el.ltrBg || '#FFF';
     const detail = el.detail || '#FFF';
     
@@ -234,11 +283,17 @@ export class CanvasEngine {
     const isFlat = !isThumb; 
 
     if (el.isLetter) {
-      this.fillStroke(ctx, (c, r) => c.rect(-r, -r, r * 2, r * 2), color, R, isFlat);
+      // Changed letters from squares to circles to match your reference image
+      this.fillStroke(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R, isFlat);
       ctx.fillStyle = el.ltrText || '#111118';
-      ctx.font = `900 ${R * 1.3}px 'Syne', sans-serif`;
+      ctx.font = `900 ${R * 1.2}px 'Nunito', sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      
+      // Counter-rotate the text so it never flips upside down on the bracelet
+      ctx.save();
+      ctx.rotate(-posAngle * Math.PI / 180);
       ctx.fillText(el.label, 0, R * 0.1);
+      ctx.restore();
       return;
     }
 
@@ -359,7 +414,6 @@ export class CanvasEngine {
     }
   }
 
-  // Generate Base64 Images for Library
   generateThumbnails(elementsArray) {
     const c = document.createElement('canvas');
     c.width = 100; c.height = 100;
@@ -370,7 +424,7 @@ export class CanvasEngine {
       ctx.save();
       const R = el.small ? 20 : (el.large ? 38 : 30);
       ctx.translate(50, 50);
-      this.drawBrutalistElement(ctx, el, R, false, true);
+      this.drawBrutalistElement(ctx, el, R, false, true, 0);
       ctx.restore();
       el.imgUrl = c.toDataURL('image/png');
     });
@@ -382,7 +436,7 @@ export class CanvasEngine {
     const ctx = c.getContext('2d');
     const R = el.small ? 20 : (el.large ? 38 : 30);
     ctx.translate(50, 50);
-    this.drawBrutalistElement(ctx, el, R, false, true);
+    this.drawBrutalistElement(ctx, el, R, false, true, 0);
     return c.toDataURL('image/png');
   }
 }

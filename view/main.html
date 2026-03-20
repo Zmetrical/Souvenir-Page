@@ -158,29 +158,38 @@
       <div class="eo-s">Pick elements from the library on the right</div>
     </div>
     <canvas id="main-canvas" width="680" height="480" style="position:relative;z-index:2;cursor:pointer;"></canvas>
-    <div class="canvas-hint">Click element to select · ↑↓ to reorder</div>
   </div>
 
-  <div class="rpanel">
+<div class="rpanel">
     <div class="rhead">( Element Library )</div>
+    
+    <div class="dir-toggle">
+      <span class="dir-lbl">Insert At:</span>
+      <div class="dir-btns">
+        <button class="dir-btn" onclick="app.ui.setAddDir('left', this)">← Left</button>
+        <button class="dir-btn active" onclick="app.ui.setAddDir('right', this)">Right →</button>
+      </div>
+    </div>
+
     <div class="ltabs" id="lib-tabs">
       <div class="ltab active" data-tab="beads"   onclick="app.ui.switchTab(this)">Beads</div>
       <div class="ltab" data-tab="charms"  onclick="app.ui.switchTab(this)">Charms</div>
       <div class="ltab" data-tab="figures" onclick="app.ui.switchTab(this)">Figures</div>
       <div class="ltab" data-tab="letters" onclick="app.ui.switchTab(this)">A–Z</div>
     </div>
-    <div id="tab-beads" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+    
+    <div id="tab-beads" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div class="lsrch"><input type="text" placeholder="Search beads..." oninput="app.ui.filterLib(this)"/></div>
       <div class="lgrid" id="grid-beads"></div>
     </div>
-    <div id="tab-charms" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+    <div id="tab-charms" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div class="lsrch"><input type="text" placeholder="Search charms..." oninput="app.ui.filterLib(this)"/></div>
       <div class="lgrid" id="grid-charms"></div>
     </div>
-    <div id="tab-figures" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+    <div id="tab-figures" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div class="lgrid" id="grid-figures"></div>
     </div>
-    <div id="tab-letters" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+    <div id="tab-letters" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div class="lclr">
         <div class="slbl" style="margin:0;font-size:.65rem;white-space:nowrap;">Color</div>
         <div class="swatches" id="ltr-sw">

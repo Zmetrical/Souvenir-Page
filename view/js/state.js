@@ -12,6 +12,8 @@ export class State {
     this.selectedId = null;
     this.ltrColor = { bg: '#ffffff', text: '#111118' };
     
+    this.addDirection = 'right'; 
+    
     this.history = [];
     this.future = [];
     this.uidCounter = 0;

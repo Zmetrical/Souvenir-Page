@@ -8,8 +8,8 @@
   --b3:3px solid var(--ink);--b2:2px solid var(--ink);
   --sh:4px 4px 0 var(--ink);--sh2:3px 3px 0 var(--ink);--sh1:2px 2px 0 var(--ink);
   --fh:'Syne',sans-serif;--fb:'Nunito',sans-serif;--fl:'Lilita One',cursive;
-  --setup-w:210px;--design-w:210px;--right-w:196px;
-  --setup-collapsed:36px;--design-collapsed:36px;
+--setup-w:210px;--design-w:210px;--right-w:260px;
+--setup-collapsed:36px;--design-collapsed:36px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--fb);background:var(--off);color:var(--ink);overflow:hidden;height:100vh;display:flex;flex-direction:column;}
@@ -225,6 +225,13 @@ body{font-family:var(--fb);background:var(--off);color:var(--ink);overflow:hidde
 .osum-t{font-family:var(--fh);font-size:.75rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;margin-bottom:8px; color:var(--ink);}
 .osum-row{display:flex;justify-content:space-between;font-size:.85rem;font-weight:800;margin-bottom:6px;color:var(--ink);}
 .osum-total{display:flex;justify-content:space-between;font-family:var(--fh);font-size:1.1rem;font-weight:800;margin-top:10px;padding-top:10px;border-top:3px solid var(--ink);}
+/* Insertion Direction Toggle */
+.dir-toggle { display:flex; align-items:center; gap: 8px; padding: 6px 10px; border-bottom: var(--b3); background: var(--off); flex-shrink:0; }
+.dir-lbl { font-size: .6rem; font-family: var(--fh); font-weight: 800; color: var(--ink2); text-transform: uppercase; white-space:nowrap; }
+.dir-btns { display:flex; flex:1; gap:4px; }
+.dir-btn { flex: 1; padding: 4px; font-size: .65rem; font-weight: 800; font-family: var(--fb); border: var(--b2); border-radius: 6px; background: var(--white); cursor: pointer; transition: all .1s; color:var(--ink); box-shadow: var(--sh1); }
+.dir-btn:hover { transform: translate(-1px, -1px); box-shadow: 2px 2px 0 var(--ink); }
+.dir-btn.active { background: var(--lime); box-shadow: inset 2px 2px 0 rgba(17,17,24,.1); transform: none; border-color:var(--ink); }
 
 .design-export-wrap{text-align:center;}
 .download-hint{font-size:.75rem;font-weight:800;color:var(--ink2);margin-top:10px; background:var(--lime); display:inline-block; padding: 4px 12px; border:var(--b2); border-radius:6px; box-shadow: 2px 2px 0 var(--ink);}

@@ -6,12 +6,23 @@ export class UIController {
     this.setupOpen = true;
     this.designOpen = true;
     this.toastTimer = null;
+    
+    // Drag and Drop State
+    this.isDragging = false;
+    this.draggedUid = null;
+    this.dragStartIndex = -1;
+    this.dragInitialState = null;
+
     this.setupListeners();
   }
 
   setupListeners() {
     const mainCanvas = document.getElementById('main-canvas');
-    mainCanvas.addEventListener('click', (e) => this.handleCanvasClick(e, mainCanvas));
+    
+    // Replace standard click with Drag & Drop Mouse Handlers
+    mainCanvas.addEventListener('mousedown', (e) => this.handleDragStart(e, mainCanvas));
+    mainCanvas.addEventListener('mousemove', (e) => this.handleDragMove(e, mainCanvas));
+    window.addEventListener('mouseup', (e) => this.handleDragEnd(e));
 
     // Close modals on overlay click
     document.querySelectorAll('.overlay').forEach(m => {
@@ -21,7 +32,7 @@ export class UIController {
     });
   }
 
-  handleCanvasClick(e, canvas) {
+  handleDragStart(e, canvas) {
     const rect = canvas.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
     const my = (e.clientY - rect.top) * (canvas.height / rect.height);
@@ -29,9 +40,10 @@ export class UIController {
     const state = this.app.state;
     if (!state.elems.length) return;
     
-    const positions = this.app.canvasEngine.getPositions(state.product, state.elems.length);
+    const positions = this.app.canvasEngine.getPositions(state);
     let hit = null;
     
+    // Find if a bead was clicked
     for (let i = state.elems.length - 1; i >= 0; i--) {
       const pos = positions[i];
       const R = (state.elems[i].small ? 14 : state.elems[i].large ? 28 : 22) + 6;
@@ -41,9 +53,76 @@ export class UIController {
       }
     }
 
-    state.selectedId = (state.selectedId === hit) ? null : hit;
-    this.updateInspector(state.elems.find(el => el.uid === state.selectedId) || null);
-    this.app.render();
+    if (hit) {
+      // Save the state BEFORE dragging starts in case we need to push it to undo history later
+      this.dragInitialState = JSON.stringify(state.elems);
+      
+      this.isDragging = true;
+      this.draggedUid = hit;
+      this.dragStartIndex = state.elems.findIndex(el => el.uid === hit);
+      
+      state.selectedId = hit;
+      canvas.style.cursor = 'grabbing'; // UX detail
+      
+      this.updateInspector(state.elems[this.dragStartIndex]);
+      this.app.render();
+    } else {
+      // Clicked empty space, deselect
+      state.selectedId = null;
+      this.updateInspector(null);
+      this.app.render();
+    }
+  }
+
+  handleDragMove(e, canvas) {
+    if (!this.isDragging || !this.draggedUid) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+    const state = this.app.state;
+    const positions = this.app.canvasEngine.getPositions(state);
+
+    let closestIdx = -1;
+    let minDist = Infinity;
+
+    // Find the bead slot closest to the mouse cursor
+    for (let i = 0; i < positions.length; i++) {
+      const dist = (mx - positions[i].x) ** 2 + (my - positions[i].y) ** 2;
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = i;
+      }
+    }
+
+    const currIdx = state.elems.findIndex(el => el.uid === this.draggedUid);
+
+    // If mouse is near a different slot, reorder array and re-render instantly!
+    if (closestIdx !== -1 && closestIdx !== currIdx) {
+      const [movedItem] = state.elems.splice(currIdx, 1);
+      state.elems.splice(closestIdx, 0, movedItem);
+      this.app.render(); 
+    }
+  }
+
+  handleDragEnd(e) {
+    if (this.isDragging) {
+      document.getElementById('main-canvas').style.cursor = 'pointer';
+      
+      const state = this.app.state;
+      const finalIdx = state.elems.findIndex(el => el.uid === this.draggedUid);
+      
+      // Only record an undo history state if the item was ACTUALLY dropped in a new location
+      if (finalIdx !== this.dragStartIndex && finalIdx !== -1) {
+        state.history.push(this.dragInitialState);
+        state.future = [];
+        this.updateHistoryButtons();
+      }
+      
+      this.isDragging = false;
+      this.draggedUid = null;
+    }
   }
 
   updateAll() {
@@ -69,7 +148,8 @@ export class UIController {
     document.getElementById('btn-redo').disabled = !state.future.length;
   }
 
-  // --- COMPONENT ACTIONS ---
+// --- COMPONENT ACTIONS ---
+// --- COMPONENT ACTIONS ---
   addElement(id) {
     const item = ELEM_MAP[id];
     if (!item) return;
@@ -78,7 +158,22 @@ export class UIController {
       return; 
     }
     this.app.state.pushHistory();
-    this.app.state.elems.push({ uid: this.app.state.generateId(), ...item });
+    
+    const newEl = { uid: this.app.state.generateId(), ...item };
+    
+    // INTUITIVE LOGIC: Insert after the currently selected bead
+    const selectedIdx = this.app.state.elems.findIndex(e => e.uid === this.app.state.selectedId);
+    
+    if (selectedIdx !== -1) {
+      this.app.state.elems.splice(selectedIdx + 1, 0, newEl);
+    } else {
+      this.app.state.elems.push(newEl); // Default to adding at the end if nothing is selected
+    }
+    
+    // Auto-select the newly added bead so you can chain additions rapidly
+    this.app.state.selectedId = newEl.uid;
+    this.updateInspector(newEl);
+    
     this.app.render(); 
     this.showToast(`Added ${item.name}`);
   }
@@ -103,11 +198,28 @@ export class UIController {
       category: 'letters'
     };
     
-    // Generate thumb dynamically for this specific color/letter combo
     letterEl.imgUrl = this.app.canvasEngine.createSingleThumb(letterEl);
     
-    this.app.state.elems.push(letterEl);
+    // INTUITIVE LOGIC: Insert after the currently selected bead
+    const selectedIdx = this.app.state.elems.findIndex(e => e.uid === this.app.state.selectedId);
+    
+    if (selectedIdx !== -1) {
+      this.app.state.elems.splice(selectedIdx + 1, 0, letterEl);
+    } else {
+      this.app.state.elems.push(letterEl); // Default to adding at the end if nothing is selected
+    }
+    
+    // Auto-select the newly added letter so you can type full words in order
+    this.app.state.selectedId = letterEl.uid;
+    this.updateInspector(letterEl);
+    
     this.app.render();
+  }
+  // NEW FUNCTION: Handle the toggle button click
+  setAddDir(dir, btnEl) {
+    this.app.state.addDirection = dir;
+    document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
   }
 
   removeBead(uid) {
