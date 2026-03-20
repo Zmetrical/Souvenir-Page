@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>ArtsyCrate — Brutalist Design Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Nunito:wght@600;700;800;900&family=Lilita+One&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+
+<div class="topbar">
+  <a href="#" class="logo">Artsy<b>Crate</b></a>
+  <div class="steps">
+    <span class="step done">1. Setup</span>
+    <span class="step-arr">›</span>
+    <span class="step active">2. Design</span>
+    <span class="step-arr">›</span>
+    <span class="step">3. Order</span>
+  </div>
+  <div class="topbar-r">
+    <button class="btn-ghost" onclick="app.ui.exportDesign()">⬇ Export PNG</button>
+    <button class="btn-order" onclick="app.ui.openOrder()">Order This →</button>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="tg">
+    <button class="tbtn" id="btn-undo" onclick="app.state.undo()" disabled>← Undo</button>
+    <button class="tbtn" id="btn-redo" onclick="app.state.redo()" disabled>Redo →</button>
+    <button class="tbtn t-pink" onclick="app.state.clearAll()">× Clear</button>
+  </div>
+  <div class="tsep"></div>
+  <div class="view-grp">
+    <button class="vtbtn active" id="vt-sil" onclick="app.ui.setView('silhouette')">Arc View</button>
+    <button class="vtbtn" id="vt-flat" onclick="app.ui.setView('flatlay')">Grid Lay</button>
+  </div>
+  <div class="tsep"></div>
+  <button class="tbtn t-lime" onclick="app.ui.openPreview()">[ Preview ]</button>
+  <div class="tsp"></div>
+  <div class="bdg teal">Beads: <span class="val" id="bead-ct">0</span> / <span id="bead-max">20</span></div>
+  <div class="tsep"></div>
+  <div class="bdg pink">Est. <span class="val" id="price-disp">₱0</span></div>
+</div>
+
+<div class="builder">
+
+  <div class="setup-panel" id="setup-panel">
+    <button class="collapse-btn" onclick="app.ui.toggleSetup()" title="Toggle Setup">
+      <svg viewBox="0 0 10 10"><polyline points="7,2 3,5 7,8"/></svg>
+    </button>
+    <div class="collapsed-label"><span>Setup</span></div>
+    <div class="setup-inner">
+      <div class="phead teal">
+        <div class="phead-ico"><svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4"/><line x1="6" y1="1" x2="6" y2="3"/><line x1="6" y1="9" x2="6" y2="11"/><line x1="1" y1="6" x2="3" y2="6"/><line x1="9" y1="6" x2="11" y2="6"/></svg></div>
+        Setup
+      </div>
+      <div class="psec open" id="sec-product">
+        <div class="psec-toggle" onclick="app.ui.toggleSec('sec-product')">
+          <span class="psec-toggle-lbl">Product Type</span>
+          <svg class="psec-arr" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+        </div>
+        <div class="psec-body">
+          <div class="type-pills">
+            <div class="tpill active" data-price="80" data-max="20" data-prod="bracelet" onclick="app.ui.setProduct(this)">
+              <div class="tp-ico">Br</div>Bracelet
+            </div>
+            <div class="tpill" data-price="100" data-max="28" data-prod="necklace" onclick="app.ui.setProduct(this)">
+              <div class="tp-ico">Nc</div>Necklace
+            </div>
+            <div class="tpill" data-price="65" data-max="12" data-prod="keychain" onclick="app.ui.setProduct(this)">
+              <div class="tp-ico">Kc</div>Keychain
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="psec open" id="sec-string">
+        <div class="psec-toggle" onclick="app.ui.toggleSec('sec-string')">
+          <span class="psec-toggle-lbl">String & Clasp</span>
+          <svg class="psec-arr" viewBox="0 0 12 12"><polyline points="2,4 6,8 10,4"/></svg>
+        </div>
+        <div class="psec-body">
+          <div class="slbl" style="margin-bottom:8px;">String Color</div>
+          <div class="swatches" id="str-sw" style="margin-bottom:14px;">
+            <div class="sw active" style="background:#FF5FA0;" onclick="app.ui.setStrCol('#FF5FA0',this)"></div>
+            <div class="sw" style="background:#1AC8C4;" onclick="app.ui.setStrCol('#1AC8C4',this)"></div>
+            <div class="sw" style="background:#A855F7;" onclick="app.ui.setStrCol('#A855F7',this)"></div>
+            <div class="sw" style="background:#111118;" onclick="app.ui.setStrCol('#111118',this)"></div>
+            <div class="sw" style="background:#fff;" onclick="app.ui.setStrCol('#ffffff',this)"></div>
+            <div class="sw" style="background:#FFD700;" onclick="app.ui.setStrCol('#FFD700',this)"></div>
+            <div class="sw" style="background:#3B82F6;" onclick="app.ui.setStrCol('#3B82F6',this)"></div>
+            <div class="sw" style="background:#EF4444;" onclick="app.ui.setStrCol('#EF4444',this)"></div>
+          </div>
+          <div class="slbl" style="margin-bottom:8px;">String Type</div>
+          <select class="sel" id="str-type" style="margin-bottom:14px;" onchange="app.ui.setStrType(this.value)">
+            <option value="Elastic">Elastic</option>
+            <option value="Cord">Cord</option>
+            <option value="Wire">Wire</option>
+            <option value="Chain">Chain</option>
+          </select>
+          <div class="slbl" style="margin-bottom:8px;">Length</div>
+          <select class="sel" id="length-sel" style="margin-bottom:14px;" onchange="app.render()">
+            <option value="small">Small — 16 cm</option>
+            <option value="medium" selected>Medium — 18 cm</option>
+            <option value="large">Large — 20 cm</option>
+            <option value="custom">Custom</option>
+          </select>
+          <div class="slbl" style="margin-bottom:8px;">Clasp</div>
+          <div class="cpills" id="clasp-pills">
+            <div class="cpill active" onclick="app.ui.setClasp('none',this)">None</div>
+            <div class="cpill" onclick="app.ui.setClasp('lobster',this)">Lobster</div>
+            <div class="cpill" onclick="app.ui.setClasp('toggle',this)">Toggle</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="design-panel" id="design-panel">
+    <button class="collapse-btn" onclick="app.ui.toggleDesign()" title="Toggle Design Panel">
+      <svg viewBox="0 0 10 10"><polyline points="7,2 3,5 7,8"/></svg>
+    </button>
+    <div class="collapsed-label"><span>My Design</span></div>
+    <div class="design-inner">
+      <div class="insp-section">
+        <div class="phead purple">
+          <div class="phead-ico"><svg viewBox="0 0 12 12"><circle cx="6" cy="5" r="3"/><line x1="6" y1="9" x2="6" y2="11"/></svg></div>
+          Selected
+        </div>
+        <div id="insp-body">
+          <div class="insp-empty">Click a bead on the canvas<br>to inspect it here</div>
+        </div>
+      </div>
+      <div class="placed-list-wrap">
+        <div class="phead lime">
+          <div class="phead-ico"><svg viewBox="0 0 12 12"><line x1="2" y1="3" x2="10" y2="3"/><line x1="2" y1="6" x2="10" y2="6"/><line x1="2" y1="9" x2="10" y2="9"/></svg></div>
+          My Design
+          <span id="elem-count-badge" style="margin-left:auto;background:var(--ink);color:white;border-radius:4px;padding:1px 7px;font-size:.6rem;font-weight:900;">0</span>
+        </div>
+        <div class="dlist" id="design-list">
+          <div class="dempty">
+            <div class="dempty-icon">✽</div>
+            No elements yet.<br>Pick from the library →
+          </div>
+        </div>
+        <div class="dfoot" id="design-foot" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-area" id="canvas-area">
+    <div class="canvas-bg"></div>
+    <div class="canvas-surface" id="canvas-surface"></div>
+    <div class="empty-over" id="empty-over">
+      <div class="eo-icon">＋</div>
+      <div class="eo-t">Build Your Stack</div>
+      <div class="eo-s">Pick elements from the library on the right</div>
+    </div>
+    <canvas id="main-canvas" width="680" height="480" style="position:relative;z-index:2;cursor:pointer;"></canvas>
+    <div class="canvas-hint">Click element to select · ↑↓ to reorder</div>
+  </div>
+
+  <div class="rpanel">
+    <div class="rhead">( Element Library )</div>
+    <div class="ltabs" id="lib-tabs">
+      <div class="ltab active" data-tab="beads"   onclick="app.ui.switchTab(this)">Beads</div>
+      <div class="ltab" data-tab="charms"  onclick="app.ui.switchTab(this)">Charms</div>
+      <div class="ltab" data-tab="figures" onclick="app.ui.switchTab(this)">Figures</div>
+      <div class="ltab" data-tab="letters" onclick="app.ui.switchTab(this)">A–Z</div>
+    </div>
+    <div id="tab-beads" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="lsrch"><input type="text" placeholder="Search beads..." oninput="app.ui.filterLib(this)"/></div>
+      <div class="lgrid" id="grid-beads"></div>
+    </div>
+    <div id="tab-charms" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="lsrch"><input type="text" placeholder="Search charms..." oninput="app.ui.filterLib(this)"/></div>
+      <div class="lgrid" id="grid-charms"></div>
+    </div>
+    <div id="tab-figures" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="lgrid" id="grid-figures"></div>
+    </div>
+    <div id="tab-letters" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="lclr">
+        <div class="slbl" style="margin:0;font-size:.65rem;white-space:nowrap;">Color</div>
+        <div class="swatches" id="ltr-sw">
+          <div class="sw active" style="background:#fff;" onclick="app.ui.setLtrCol('#ffffff','#111118',this)"></div>
+          <div class="sw" style="background:#111118;" onclick="app.ui.setLtrCol('#111118','#ffffff',this)"></div>
+          <div class="sw" style="background:#FF5FA0;" onclick="app.ui.setLtrCol('#FF5FA0','#111118',this)"></div>
+          <div class="sw" style="background:#1AC8C4;" onclick="app.ui.setLtrCol('#1AC8C4','#111118',this)"></div>
+          <div class="sw" style="background:#C8E833;" onclick="app.ui.setLtrCol('#C8E833','#111118',this)"></div>
+          <div class="sw" style="background:#A855F7;" onclick="app.ui.setLtrCol('#A855F7','#ffffff',this)"></div>
+          <div class="sw" style="background:#FFD700;" onclick="app.ui.setLtrCol('#FFD700','#111118',this)"></div>
+        </div>
+      </div>
+      <div class="lgrid-ltrs" id="grid-ltrs"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="prev-modal">
+  <div class="mbox">
+    <div class="mhead teal">
+      <div class="mtitle">( Design Preview )</div>
+      <button class="mclose" onclick="app.ui.closeModal('prev-modal')">×</button>
+    </div>
+    <div class="mbody">
+      <div class="prev-stage" id="prev-stage">
+        <div class="design-export-wrap">
+          <canvas id="preview-canvas" width="460" height="320"></canvas>
+          <div class="download-hint">👆 Right-click → Save image</div>
+        </div>
+      </div>
+      <div class="minfo" id="prev-info"></div>
+      <div class="mbtns">
+        <button class="mbtn secondary" onclick="app.ui.closeModal('prev-modal')">← Edit</button>
+        <button class="mbtn primary" onclick="app.ui.downloadDesign()">⬇ Download PNG</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="order-modal">
+  <div class="mbox">
+    <div class="mhead pink">
+      <div class="mtitle">( Place Your Order )</div>
+      <button class="mclose" onclick="app.ui.closeModal('order-modal')">×</button>
+    </div>
+    <div class="mbody">
+      <div class="form-col">
+        <div class="frow2">
+          <div class="frow"><label class="flbl">First Name</label><input class="finput" placeholder="Maria"/></div>
+          <div class="frow"><label class="flbl">Last Name</label><input class="finput" placeholder="Santos"/></div>
+        </div>
+        <div class="frow"><label class="flbl">Contact No.</label><input class="finput" placeholder="09xx-xxx-xxxx"/></div>
+        <div class="frow"><label class="flbl">Special Notes</label><input class="finput" placeholder="Any message..."/></div>
+        <div class="osum">
+          <div class="osum-t">Order Summary</div>
+          <div class="osum-row"><span id="os-prod">Bracelet · Medium</span><span id="os-base">₱80</span></div>
+          <div class="osum-row"><span id="os-elems">0 elements</span><span id="os-ecost">₱0</span></div>
+          <div class="osum-total"><span>Total Estimate</span><span id="os-total" style="color:var(--pink-dk);">₱0.00</span></div>
+        </div>
+        <div id="order-design-thumb" style="display:none; margin-top:8px;">
+          <div class="slbl">Design Reference</div>
+          <canvas id="order-canvas" width="300" height="140" style="width:100%;border:var(--b3);border-radius:10px;box-shadow:4px 4px 0 var(--ink); background:var(--off);"></canvas>
+        </div>
+        <div class="mbtns" style="margin-top:10px;">
+          <button class="mbtn secondary" onclick="app.ui.closeModal('order-modal')">← Back</button>
+          <button class="mbtn primary" onclick="app.ui.submitOrder()">Submit Order ✓</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="./js/main.js"></script>
+
+</body>
+</html>
