@@ -41,13 +41,13 @@
         <div class="psec-body">
           <div class="type-pills">
             <div class="tpill active" data-price="80" data-max="20" data-prod="bracelet" onclick="app.ui.setProduct(this)">
-              <div class="tp-ico">Br</div>Bracelet
+              Bracelet
             </div>
             <div class="tpill" data-price="100" data-max="28" data-prod="necklace" onclick="app.ui.setProduct(this)">
-              <div class="tp-ico">Nc</div>Necklace
+              Necklace
             </div>
             <div class="tpill" data-price="65" data-max="12" data-prod="keychain" onclick="app.ui.setProduct(this)">
-              <div class="tp-ico">Kc</div>Keychain
+              Keychain
             </div>
           </div>
         </div>
@@ -159,11 +159,6 @@
       <button class="tbtn" id="btn-redo" onclick="app.state.redo()" disabled>Redo →</button>
     </div>
 
-    <div class="empty-over" id="empty-over">
-      <div class="eo-icon">＋</div>
-      <div class="eo-t">Build Your Stack</div>
-      <div class="eo-s">Pick elements from the library on the right</div>
-    </div>
     <canvas id="main-canvas" width="680" height="480" style="position:relative;z-index:2;cursor:pointer;"></canvas>
   </div>
 
@@ -240,7 +235,6 @@
       <div class="prev-stage" id="prev-stage">
         <div class="design-export-wrap">
           <canvas id="preview-canvas" width="460" height="320"></canvas>
-          <div class="download-hint">👆 Right-click → Save image</div>
         </div>
       </div>
       <div class="minfo" id="prev-info"></div>

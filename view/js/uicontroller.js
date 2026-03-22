@@ -116,7 +116,6 @@ export class UIController {
     const beadMax = document.getElementById('bead-max');
     if (beadCt)  beadCt.textContent  = state.elems.length;
     if (beadMax) beadMax.textContent = state.maxBeads;
-    if (priceDisp) priceDisp.textContent = `₱${state.basePrice + ec}`;
     const emptyOver = document.getElementById('empty-over');
     if (emptyOver) emptyOver.style.display = state.elems.length ? 'none' : 'flex';
   }

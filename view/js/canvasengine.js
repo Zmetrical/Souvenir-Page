@@ -154,10 +154,10 @@ export class CanvasEngine {
       }
     }
 
-    // Keychain ring — flat gold
+    // Keychain ring
     if (state.product === 'keychain' && !flat) {
       ctx.save();
-      ctx.strokeStyle = '#D4AF37'; ctx.lineWidth = 5;
+      ctx.strokeStyle = '#F7A8C8'; ctx.lineWidth = 5;
       ctx.beginPath(); ctx.arc(340, 130, 40, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
@@ -199,7 +199,7 @@ export class CanvasEngine {
   drawClasp(ctx, product, clasp, color) {
     if (clasp === 'none') return;
     ctx.save();
-    ctx.fillStyle = '#D4AF37';
+    ctx.fillStyle = '#F7A8C8';
     if (product === 'bracelet') {
       ctx.translate(150, 170); ctx.rotate(-0.3);
       ctx.beginPath(); this.roundRect(ctx, -8, -8, 16, 16, 4); ctx.fill();
