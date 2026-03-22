@@ -3,31 +3,24 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>ArtsyCrate — Brutalist Design Builder</title>
+  <title>ArtsyCrate — Design Builder</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="./css/style.css" />
-
 </head>
 <body>
 
 <div class="topbar">
   <a href="#" class="logo">Artsy<b>Crate</b></a>
-
   <div class="topbar-r">
     <button class="btn-order" onclick="app.ui.openOrder()">Order This →</button>
   </div>
 </div>
 
-
-
 <div class="builder">
 
+  <!-- ── Setup Panel ── -->
   <div class="setup-panel" id="setup-panel">
-    <button class="collapse-btn" onclick="app.ui.toggleSetup()" title="Toggle Setup">
-      <svg viewBox="0 0 10 10"><polyline points="7,2 3,5 7,8"/></svg>
-    </button>
-    <div class="collapsed-label"><span>Setup</span></div>
     <div class="setup-inner">
       <div class="phead teal">
         <div class="phead-ico"><svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4"/><line x1="6" y1="1" x2="6" y2="3"/><line x1="6" y1="9" x2="6" y2="11"/><line x1="1" y1="6" x2="3" y2="6"/><line x1="9" y1="6" x2="11" y2="6"/></svg></div>
@@ -94,12 +87,8 @@
     </div>
   </div>
 
-  <!-- ── Design panel: inspector + list + clear footer (no total estimate) ── -->
+  <!-- ── Design Panel ── -->
   <div class="design-panel" id="design-panel">
-    <button class="collapse-btn" onclick="app.ui.toggleDesign()" title="Toggle Design Panel">
-      <svg viewBox="0 0 10 10"><polyline points="7,2 3,5 7,8"/></svg>
-    </button>
-    <div class="collapsed-label"><span>My Design</span></div>
     <div class="design-inner">
       <div class="insp-section">
         <div class="phead lime">
@@ -122,7 +111,6 @@
             No elements yet.<br>Pick from the library →
           </div>
         </div>
-        <!-- Bead ratio + Clear button at the bottom of design panel -->
         <div class="design-clear-foot">
           <div class="design-bead-ratio">
             <span class="bdg teal" style="width:100%;justify-content:center;display:flex;">
@@ -135,12 +123,11 @@
     </div>
   </div>
 
-  <!-- ── Canvas area with floating view & preview controls ── -->
+  <!-- ── Canvas Area ── -->
   <div class="canvas-area" id="canvas-area">
     <div class="canvas-bg"></div>
     <div class="canvas-surface" id="canvas-surface"></div>
 
-    <!-- Top-left: Arc View / Grid Lay toggle -->
     <div class="canvas-float top-left">
       <div class="view-grp">
         <button class="vtbtn active" id="vt-sil" onclick="app.ui.setView('silhouette')">Arc View</button>
@@ -148,12 +135,10 @@
       </div>
     </div>
 
-    <!-- Top-right: Preview button -->
     <div class="canvas-float top-right">
       <button class="tbtn t-lime" onclick="app.ui.openPreview()">[ Preview ]</button>
     </div>
 
-    <!-- Bottom-left: Undo / Redo -->
     <div class="canvas-float bottom-left">
       <button class="tbtn" id="btn-undo" onclick="app.state.undo()" disabled>← Undo</button>
       <button class="tbtn" id="btn-redo" onclick="app.state.redo()" disabled>Redo →</button>
@@ -162,9 +147,10 @@
     <canvas id="main-canvas" width="680" height="480" style="position:relative;z-index:2;cursor:pointer;"></canvas>
   </div>
 
+  <!-- ── Right Panel ── -->
   <div class="rpanel">
     <div class="rhead">( Element Library )</div>
-    
+
     <div class="dir-toggle">
       <span class="dir-lbl">Insert At:</span>
       <div class="dir-btns">
@@ -179,7 +165,7 @@
       <div class="ltab" data-tab="figures" onclick="app.ui.switchTab(this)">Figures</div>
       <div class="ltab" data-tab="letters" onclick="app.ui.switchTab(this)">A–Z</div>
     </div>
-    
+
     <div id="tab-beads" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div class="bead-groups" id="bead-groups"></div>
     </div>
@@ -188,12 +174,12 @@
       <div class="lsrch"><input type="text" placeholder="Search charms..." oninput="app.ui.filterLib(this)"/></div>
       <div class="lgrid" id="grid-charms"></div>
     </div>
+
     <div id="tab-figures" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div id="grid-figures" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;"></div>
     </div>
 
     <div id="tab-letters" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
-      <!-- Row 1: Tile shape toggle (Square / Circle) -->
       <div class="lshape-row">
         <span class="dir-lbl">Tile Shape:</span>
         <div class="lshape-btns">
@@ -205,7 +191,6 @@
           </button>
         </div>
       </div>
-      <!-- Row 2: Color swatches -->
       <div class="lclr">
         <div class="slbl" style="margin:0;font-size:.65rem;white-space:nowrap;">Color</div>
         <div class="swatches" id="ltr-sw">
@@ -218,7 +203,6 @@
           <div class="sw"        style="background:#3D3D52;"  onclick="app.ui.setLtrCol('#3D3D52','#ffffff',this)"></div>
         </div>
       </div>
-      <!-- Row 3: Letter grid -->
       <div class="lgrid-ltrs" id="grid-ltrs"></div>
     </div>
   </div>

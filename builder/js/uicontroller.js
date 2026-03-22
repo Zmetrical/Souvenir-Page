@@ -3,8 +3,6 @@ import { BEADS, CHARMS, FIGURES, ELEM_MAP } from './data.js';
 export class UIController {
   constructor(appInstance) {
     this.app = appInstance;
-    this.setupOpen = true;
-    this.designOpen = true;
     this.toastTimer = null;
 
     this.isDragging = false;
@@ -111,7 +109,6 @@ export class UIController {
 
   updateCounters() {
     const state = this.app.state;
-    const ec = state.elems.reduce((s, e) => s + (e.price || 8), 0);
     const beadCt  = document.getElementById('bead-ct');
     const beadMax = document.getElementById('bead-max');
     if (beadCt)  beadCt.textContent  = state.elems.length;
@@ -253,7 +250,6 @@ export class UIController {
       return;
     }
 
-    // Figures: group by series → collapsible accordion per series
     const groups = {};
     items.forEach(item => {
       const g = item.series || 'Other';
@@ -291,7 +287,6 @@ export class UIController {
       </div>`).join('');
   }
 
-  // ─── GROUPED BEAD PANEL (collapsible accordion) ──────────────────────────────
   buildBeadsPanel(items) {
     const groups = {};
     items.forEach(item => {
@@ -401,8 +396,6 @@ export class UIController {
     this.app.render();
   }
 
-  toggleSetup() { this.setupOpen = !this.setupOpen; document.getElementById('setup-panel').classList.toggle('collapsed', !this.setupOpen); }
-  toggleDesign() { this.designOpen = !this.designOpen; document.getElementById('design-panel').classList.toggle('collapsed', !this.designOpen); }
   toggleSec(id) { document.getElementById(id).classList.toggle('open'); }
 
   switchTab(el) {
