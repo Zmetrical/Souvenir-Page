@@ -1,4 +1,4 @@
-import { BEADS, CHARMS, FIGURES, ELEM_MAP } from './data.js';
+import { BEADS, FIGURES, CHARMS, ELEM_MAP } from './data.js';
 
 export class UIController {
   constructor(appInstance) {
@@ -9,6 +9,9 @@ export class UIController {
     this.draggedUid = null;
     this.dragStartIndex = -1;
     this.dragInitialState = null;
+
+    // design-list panel drag-and-drop
+    this.listDragSrcIdx = -1;
 
     this.setupListeners();
   }
@@ -53,6 +56,11 @@ export class UIController {
       this.draggedUid = hit;
       this.dragStartIndex = state.elems.findIndex(el => el.uid === hit);
       state.selectedId = hit;
+      // Auto-switch active strand when tapping an element on keychain
+      const hitEl = state.elems[this.dragStartIndex];
+      if (state.product === 'keychain' && hitEl?.strand != null) {
+        state.activeStrand = hitEl.strand;
+      }
       canvas.style.cursor = 'grabbing';
       this.updateInspector(state.elems[this.dragStartIndex]);
       this.app.render();
@@ -101,6 +109,10 @@ export class UIController {
     }
   }
 
+  _getStrandBeadCount(strandIdx) {
+    return this.app.state.elems.filter(e => (e.strand ?? 0) === strandIdx).length;
+  }
+
   updateAll() {
     this.updateCounters();
     this.renderDesignList();
@@ -111,12 +123,23 @@ export class UIController {
     const state = this.app.state;
     const beadCt  = document.getElementById('bead-ct');
     const beadMax = document.getElementById('bead-max');
-    if (beadCt)  beadCt.textContent  = state.elems.length;
-    if (beadMax) beadMax.textContent = state.maxBeads;
+
+    if (state.product === 'keychain' && state.keychainStrands > 1) {
+      // Show count for the active strand
+      const cnt = this._getStrandBeadCount(state.activeStrand);
+      if (beadCt)  beadCt.textContent  = `S${state.activeStrand + 1}: ${cnt}`;
+      if (beadMax) beadMax.textContent = state.maxBeads;
+    } else {
+      if (beadCt)  beadCt.textContent  = state.elems.length;
+      if (beadMax) beadMax.textContent = state.maxBeads;
+    }
+
     const emptyOver = document.getElementById('empty-over');
     if (emptyOver) emptyOver.style.display = state.elems.length ? 'none' : 'flex';
   }
 
+  // Renders the "Adding to strand" selector inside the design panel
+  // Only visible when product is keychain and strands > 1
   updateHistoryButtons() {
     const state = this.app.state;
     document.getElementById('btn-undo').disabled = !state.history.length;
@@ -126,48 +149,78 @@ export class UIController {
   addElement(id) {
     const item = ELEM_MAP[id];
     if (!item) return;
-    if (this.app.state.elems.length >= this.app.state.maxBeads) { this.showToast('Max elements reached!'); return; }
-    this.app.state.pushHistory();
+    const state = this.app.state;
 
-    const newEl = { uid: this.app.state.generateId(), ...item };
-    const selectedIdx = this.app.state.elems.findIndex(e => e.uid === this.app.state.selectedId);
-    if (selectedIdx !== -1) {
-      this.app.state.elems.splice(selectedIdx + 1, 0, newEl);
+    // Per-strand max for keychain, global max for others
+    if (state.product === 'keychain') {
+      const strandCount = this._getStrandBeadCount(state.activeStrand);
+      if (strandCount >= state.maxBeads) { this.showToast(`Strand ${state.activeStrand + 1} is full!`); return; }
     } else {
-      this.app.state.elems.push(newEl);
+      if (state.elems.length >= state.maxBeads) { this.showToast('Max elements reached!'); return; }
     }
 
-    this.app.state.selectedId = newEl.uid;
+    state.pushHistory();
+
+    const newEl = { uid: state.generateId(), ...item };
+    if (state.product === 'keychain') {
+      newEl.strand = state.activeStrand; // always use activeStrand — never inherit from selection
+    }
+
+    const selectedIdx = state.elems.findIndex(e => e.uid === state.selectedId);
+    // Only insert after selected if it's on the same strand
+    const selEl = state.elems[selectedIdx];
+    if (selectedIdx !== -1 && state.product === 'keychain' && (selEl?.strand ?? 0) === newEl.strand) {
+      state.elems.splice(selectedIdx + 1, 0, newEl);
+    } else if (selectedIdx !== -1 && state.product !== 'keychain') {
+      state.elems.splice(selectedIdx + 1, 0, newEl);
+    } else {
+      state.elems.push(newEl);
+    }
+
+    state.selectedId = newEl.uid;
     this.updateInspector(newEl);
     this.app.render();
     this.showToast(`Added ${item.name}`);
   }
 
   addLetter(ch) {
-    if (this.app.state.elems.length >= this.app.state.maxBeads) { this.showToast('Max elements reached!'); return; }
-    this.app.state.pushHistory();
+    const state = this.app.state;
+
+    if (state.product === 'keychain') {
+      if (this._getStrandBeadCount(state.activeStrand) >= state.maxBeads) {
+        this.showToast(`Strand ${state.activeStrand + 1} is full!`); return;
+      }
+    } else {
+      if (state.elems.length >= state.maxBeads) { this.showToast('Max elements reached!'); return; }
+    }
+
+    state.pushHistory();
 
     const letterEl = {
-      uid: this.app.state.generateId(),
+      uid: state.generateId(),
       id: 'letter_' + ch,
       name: 'Letter ' + ch,
       isLetter: true,
-      letterShape: this.app.state.letterShape || 'round',
-      ltrBg: this.app.state.ltrColor.bg,
-      ltrText: this.app.state.ltrColor.text,
+      letterShape: state.letterShape || 'round',
+      ltrBg:   state.ltrColor.bg,
+      ltrText: state.ltrColor.text,
       label: ch,
-      price: 8, stock: 'in', category: 'letters'
+      price: 8, stock: 'in', category: 'letters',
+      strand: state.product === 'keychain' ? state.activeStrand : undefined,
     };
 
     letterEl.imgUrl = this.app.canvasEngine.createSingleThumb(letterEl);
-    const selectedIdx = this.app.state.elems.findIndex(e => e.uid === this.app.state.selectedId);
-    if (selectedIdx !== -1) {
-      this.app.state.elems.splice(selectedIdx + 1, 0, letterEl);
+    const selectedIdx = state.elems.findIndex(e => e.uid === state.selectedId);
+    const selEl = state.elems[selectedIdx];
+    if (selectedIdx !== -1 && state.product === 'keychain' && (selEl?.strand ?? 0) === letterEl.strand) {
+      state.elems.splice(selectedIdx + 1, 0, letterEl);
+    } else if (selectedIdx !== -1 && state.product !== 'keychain') {
+      state.elems.splice(selectedIdx + 1, 0, letterEl);
     } else {
-      this.app.state.elems.push(letterEl);
+      state.elems.push(letterEl);
     }
 
-    this.app.state.selectedId = letterEl.uid;
+    state.selectedId = letterEl.uid;
     this.updateInspector(letterEl);
     this.app.render();
   }
@@ -208,22 +261,66 @@ export class UIController {
 
   selectBead(uid) {
     this.app.state.selectedId = this.app.state.selectedId === uid ? null : uid;
-    this.updateInspector(this.app.state.elems.find(e => e.uid === uid) || null);
+    const el = this.app.state.elems.find(e => e.uid === uid);
+    if (el && this.app.state.product === 'keychain' && el.strand != null) {
+      this.app.state.activeStrand = el.strand;
+    }
+    this.updateInspector(el || null);
     this.app.render();
   }
 
   renderDesignList() {
     const state = this.app.state;
-    const list = document.getElementById('design-list');
-    document.getElementById('elem-count-badge').textContent = state.elems.length;
+    const list  = document.getElementById('design-list');
 
-    if (!state.elems.length) {
-      list.innerHTML = `<div class="dempty"><div class="dempty-icon">✽</div>No elements yet.<br>Pick from the library →</div>`;
+    // ── Strand selector (keychain only, 2+ strands) ───────────────────────
+    const selectorWrap = document.getElementById('strand-selector-panel');
+    if (selectorWrap) {
+      if (state.product === 'keychain' && state.keychainStrands > 1) {
+        selectorWrap.style.display = 'block';
+        const btns = document.getElementById('strand-selector-btns');
+        if (btns) {
+          btns.innerHTML = Array.from({ length: state.keychainStrands }, (_, i) => {
+            const cnt = this._getStrandBeadCount(i);
+            return `<button class="cpill active-strand-btn${state.activeStrand === i ? ' active' : ''}"
+                            onclick="app.ui.setActiveStrand(${i}, this)">
+                      Strand ${i + 1}
+                      <span style="opacity:.6;font-weight:600;margin-left:3px;">${cnt}/${state.maxBeads}</span>
+                    </button>`;
+          }).join('');
+        }
+      } else {
+        selectorWrap.style.display = 'none';
+      }
+    }
+
+    // ── Filter elements by active strand for keychain ─────────────────────
+    const visibleElems = (state.product === 'keychain')
+      ? state.elems.filter(el => (el.strand ?? 0) === state.activeStrand)
+      : state.elems;
+
+    document.getElementById('elem-count-badge').textContent =
+      state.product === 'keychain'
+        ? `${visibleElems.length}/${state.maxBeads}`
+        : state.elems.length;
+
+    if (!visibleElems.length) {
+      list.innerHTML = `<div class="dempty">
+        <div class="dempty-icon">✽</div>
+        ${state.product === 'keychain' && state.keychainStrands > 1
+          ? `No elements on Strand ${state.activeStrand + 1} yet.`
+          : 'No elements yet.'
+        }<br>Pick from the library ←
+      </div>`;
       return;
     }
 
-    list.innerHTML = state.elems.map((el, i) => `
-      <div class="ditem${state.selectedId === el.uid ? ' selected' : ''}" onclick="app.ui.selectBead('${el.uid}')">
+    list.innerHTML = visibleElems.map((el, i) => `
+      <div class="ditem${state.selectedId === el.uid ? ' selected' : ''}"
+           data-uid="${el.uid}"
+           data-globalidx="${state.elems.indexOf(el)}"
+           draggable="true"
+           onclick="app.ui.selectBead('${el.uid}')">
         <span class="di-num">${i + 1}</span>
         <div class="di-thumb${el.useImg ? ' figure' : ''}"><img src="${el.imgUrl}"/></div>
         <span class="di-name" title="${el.name}">${el.name}</span>
@@ -234,21 +331,57 @@ export class UIController {
           <button class="di-btn del" onclick="event.stopPropagation(); app.ui.removeBead('${el.uid}')">×</button>
         </div>
       </div>`).join('');
+
+    // ── Drag-and-drop (uses uid so it works on filtered lists) ────────────
+    list.querySelectorAll('.ditem').forEach(row => {
+      row.addEventListener('dragstart', e => {
+        this.listDragSrcUid = row.dataset.uid;
+        this.app.state.pushHistory();
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      row.addEventListener('dragend', () => {
+        list.querySelectorAll('.ditem').forEach(r => r.classList.remove('dragging', 'drag-over'));
+      });
+      row.addEventListener('dragover', e => {
+        e.preventDefault();
+        list.querySelectorAll('.ditem').forEach(r => r.classList.remove('drag-over'));
+        row.classList.add('drag-over');
+      });
+      row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+      row.addEventListener('drop', e => {
+        e.preventDefault(); e.stopPropagation();
+        if (row.dataset.uid === this.listDragSrcUid) return;
+        const elems   = this.app.state.elems;
+        const srcIdx  = elems.findIndex(el => el.uid === this.listDragSrcUid);
+        const destIdx = elems.findIndex(el => el.uid === row.dataset.uid);
+        if (srcIdx === -1 || destIdx === -1) return;
+        const [moved] = elems.splice(srcIdx, 1);
+        elems.splice(destIdx, 0, moved);
+        this.app.render();
+        this.showToast('Reordered ✓');
+      });
+    });
   }
 
-  buildGrid(gridId, items, isFigure = false) {
-    const container = document.getElementById(gridId);
-    if (!isFigure) {
-      container.innerHTML = items.map(item => `
-        <div class="ecard${item.stock === 'out' ? ' out' : ''}"
-             onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
-             title="${item.name}">
-          <div class="eprev-img"><img src="${item.imgUrl}" alt="${item.name}"/></div>
-          <div class="ename">${item.name}</div>
-          <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
-        </div>`).join('');
-      return;
-    }
+  // Figures tab — flat 2-col grid of shaped decorative charms
+  buildFiguresGrid(items) {
+    const container = document.getElementById('grid-figures');
+    if (!container) return;
+    container.innerHTML = items.map(item => `
+      <div class="ecard${item.stock === 'out' ? ' out' : ''}"
+           onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
+           title="${item.name}">
+        <div class="eprev-img"><img src="${item.imgUrl}" alt="${item.name}"/></div>
+        <div class="ename">${item.name}</div>
+        <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
+      </div>`).join('');
+  }
+
+  // Charms tab — image-based series grouped in accordions
+  buildCharmsGrid(items) {
+    const container = document.getElementById('grid-charms');
+    if (!container) return;
 
     const groups = {};
     items.forEach(item => {
@@ -257,7 +390,7 @@ export class UIController {
       groups[g].push(item);
     });
 
-    container.style.cssText = 'overflow-y:auto;flex:1;padding:8px;display:flex;flex-direction:column;gap:8px;background:var(--off)';
+    container.style.cssText = 'overflow-y:auto;flex:1;padding:8px;display:flex;flex-direction:column;gap:5px;';
     container.innerHTML = Object.entries(groups).map(([seriesName, figs], idx) => `
       <div class="bgroup${idx === 0 ? ' open' : ''}">
         <div class="bgroup-head" onclick="this.closest('.bgroup').classList.toggle('open')">
@@ -375,6 +508,12 @@ export class UIController {
     el.classList.add('active');
     this.app.render();
   }
+  setRingCol(col, el) {
+    this.app.state.ringColor = col;
+    document.querySelectorAll('#ring-sw .sw').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    this.app.render();
+  }
   setStrType(type) { this.app.state.strType = type; this.app.render(); }
   setLtrCol(bg, text, el) {
     this.app.state.ltrColor = { bg, text };
@@ -398,9 +537,29 @@ export class UIController {
 
   toggleSec(id) { document.getElementById(id).classList.toggle('open'); }
 
+  setStrandCount(n, btnEl) {
+    this.app.state.keychainStrands = n;
+    if (this.app.state.activeStrand >= n) this.app.state.activeStrand = 0;
+    document.querySelectorAll('.strand-count-btn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+    this.app.render();
+  }
+
+  setActiveStrand(n, btnEl) {
+    this.app.state.activeStrand = n;
+    this.app.render(); // triggers updateAll → renderDesignList which rebuilds selector + list
+  }
+
+  setRingType(type, btnEl) {
+    this.app.state.ringType = type;
+    document.querySelectorAll('.ring-type-btn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+    this.app.render();
+  }
+
   switchTab(el) {
     const tab = el.dataset.tab;
-    ['beads','charms','figures','letters'].forEach(t => {
+    ['beads', 'figures', 'charms', 'letters'].forEach(t => {
       const el2 = document.getElementById('tab-' + t);
       if (el2) el2.style.display = t === tab ? 'flex' : 'none';
     });
@@ -408,10 +567,21 @@ export class UIController {
     el.classList.add('active');
   }
 
-  filterLib(input) {
-    const q = input.value.toLowerCase();
-    input.closest('[id^="tab-"]').querySelectorAll('.ecard').forEach(c => {
-      c.style.display = c.querySelector('.ename').textContent.toLowerCase().includes(q) ? '' : 'none';
+  filterCharms(input, gridId) {
+    const q = input.value.toLowerCase().trim();
+    const container = document.getElementById(gridId);
+    if (!container) return;
+    if (!q) {
+      container.querySelectorAll('.ecard, .bgroup').forEach(el => el.style.display = '');
+      return;
+    }
+    container.querySelectorAll('.ecard').forEach(card => {
+      const name = card.querySelector('.ename')?.textContent.toLowerCase() || '';
+      card.style.display = name.includes(q) ? '' : 'none';
+    });
+    container.querySelectorAll('.bgroup').forEach(group => {
+      const visible = [...group.querySelectorAll('.ecard')].some(c => c.style.display !== 'none');
+      group.style.display = visible ? '' : 'none';
     });
   }
 

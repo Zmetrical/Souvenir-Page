@@ -43,7 +43,6 @@ export class CanvasEngine {
     const count = elems.length;
     if (!count) return [];
 
-    // No gap padding — flat fills sit flush against each other like the reference
     const radii = elems.map(el =>
       el.useImg ? 8 : el.shape === 'ellipse' ? 34 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22
     );
@@ -62,7 +61,6 @@ export class CanvasEngine {
       const { cx, cy, rx, ry } = this.PATHS.bracelet;
       const angles     = radii.map(r => (r * 2) / rx);
       const totalAngle = angles.reduce((s, a) => s + a, 0);
-      // Start from LEFT side of bottom-center, move right → index 0 = left, last = right
       let t = Math.PI / 2 + totalAngle / 2 - angles[0] / 2;
       return elems.map((el, i) => {
         const pos = { x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t), angle: t * 180 / Math.PI + 90 };
@@ -74,23 +72,60 @@ export class CanvasEngine {
     if (state.product === 'necklace') {
       const approxLen  = 800;
       const totalWidth = radii.reduce((s, r) => s + r * 2, 0);
-      // Start from RIGHT of center, move left → index 0 = left, last = right
-      let t = 0.5 + totalWidth / approxLen / 2;
+      // Start from LEFT of center, move right → index 0 = left, last = right
+      let t = 0.5 - totalWidth / approxLen / 2;
       return elems.map((el, i) => {
         const { x, y, dx, dy } = this.bezierPoint(60, 80, 60, 420, 620, 420, 620, 80, t);
         const pos = { x, y, angle: Math.atan2(dy, dx) * 180 / Math.PI };
-        if (i < count - 1) t -= (radii[i] + radii[i + 1]) / approxLen;
+        if (i < count - 1) t += (radii[i] + radii[i + 1]) / approxLen;
         return pos;
       });
     }
 
     if (state.product === 'keychain') {
-      let y = 190 + radii[0];
-      return elems.map((el, i) => {
-        const pos = { x: 340, y, angle: 90 };
-        if (i < count - 1) y += radii[i] + radii[i + 1];
-        return pos;
-      });
+      const strandCount = state.keychainStrands || 1;
+      const zoneTop = 195, zoneBot = 460, zoneH = zoneBot - zoneTop;
+
+      // X centre for each strand
+      const spacing = 90;
+      const totalW  = (strandCount - 1) * spacing;
+      const strandX = Array.from({ length: strandCount }, (_, i) => 340 - totalW / 2 + i * spacing);
+
+      // Group element indices by their strand property
+      const groups = {};
+      for (let i = 0; i < count; i++) {
+        const s = elems[i].strand ?? 0;
+        if (!groups[s]) groups[s] = [];
+        groups[s].push(i);
+      }
+
+      const positions = new Array(count);
+      const scaleMap  = new Array(count).fill(1);
+
+      for (let s = 0; s < strandCount; s++) {
+        const idxs = groups[s] || [];
+        if (!idxs.length) continue;
+
+        const sR      = idxs.map(i => radii[i]);
+        const totalH  = sR.reduce((sum, r) => sum + r * 2, 0);
+        const scale   = totalH > zoneH ? zoneH / totalH : 1;
+        const scaledR = sR.map(r => r * scale);
+        const scaledH = scaledR.reduce((sum, r) => sum + r * 2, 0);
+
+        // Always start from top of zone, never center
+        let y = zoneTop + scaledR[0];
+        const x = strandX[s];
+
+        idxs.forEach((elemIdx, j) => {
+          positions[elemIdx] = { x, y, angle: 90 };
+          scaleMap[elemIdx]  = scale;
+          if (j < idxs.length - 1) y += scaledR[j] + scaledR[j + 1];
+        });
+      }
+
+      state._keychainScales = scaleMap;
+      state._strandX        = strandX;
+      return positions;
     }
 
     return [];
@@ -118,11 +153,12 @@ export class CanvasEngine {
 
     const flat = state.view === 'flatlay';
 
-    if (flat) {
-      ctx.save();
-      ctx.fillStyle = '#FFFFFF';
-      this.roundRect(ctx, 20, 20, W - 40, H - 40, 18); ctx.fill();
-      ctx.restore();
+    // Pre-compute keychain strand X positions so guide lines are current
+    if (state.product === 'keychain') {
+      const n       = state.keychainStrands || 1;
+      const spacing = 90;
+      const totalW  = (n - 1) * spacing;
+      state._strandX = Array.from({ length: n }, (_, i) => 340 - totalW / 2 + i * spacing);
     }
 
     // Guide line
@@ -133,7 +169,9 @@ export class CanvasEngine {
     ctx.setLineDash([]); ctx.restore();
 
     if (state.elems.length) {
-      ctx.save(); this.drawString(ctx, state); ctx.restore();
+      ctx.save();
+      if (state.product !== 'keychain') this.drawString(ctx, state);
+      ctx.restore();
     }
 
     if (!flat) this.drawClasp(ctx, state.product, state.clasp, state.strColor);
@@ -143,7 +181,9 @@ export class CanvasEngine {
       for (let i = 0; i < state.elems.length; i++) {
         const el  = state.elems[i];
         const pos = positions[i] || { x: W / 2, y: H / 2, angle: 0 };
-        const R   = el.useImg ? 8 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22;
+        const baseR = el.useImg ? 8 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22;
+        const kScale = (state._keychainScales && state._keychainScales[i] != null) ? state._keychainScales[i] : 1;
+        const R   = baseR * kScale;
         const sel = interactive && state.selectedId === el.uid;
 
         ctx.save();
@@ -154,16 +194,13 @@ export class CanvasEngine {
       }
     }
 
-    // Keychain ring
+    // Keychain connector ring + strand cords
     if (state.product === 'keychain' && !flat) {
-      ctx.save();
-      ctx.strokeStyle = '#F7A8C8'; ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.arc(340, 130, 40, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
+      this.drawKeychainConnector(ctx, state);
     }
   }
 
-  // ─── STRING — flat single stroke ────────────────────────────────────────────
+  // ─── STRING ─────────────────────────────────────────────────────────────────
   drawString(ctx, state) {
     ctx.save();
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -176,7 +213,6 @@ export class CanvasEngine {
     } else if (state.strType === 'Wire') {
       ctx.strokeStyle = c; ctx.lineWidth = 2; drawPath(); ctx.stroke();
     } else {
-      // Elastic + Cord — same flat stroke
       ctx.strokeStyle = c; ctx.lineWidth = 5; drawPath(); ctx.stroke();
     }
     ctx.restore();
@@ -192,9 +228,112 @@ export class CanvasEngine {
     } else if (state.product === 'necklace') {
       ctx.beginPath(); ctx.moveTo(60, 80); ctx.bezierCurveTo(60, 420, 620, 420, 620, 80);
     } else {
-      ctx.beginPath(); ctx.moveTo(340, 190); ctx.lineTo(340, 430);
+      // Keychain: one vertical line per strand
+      const strandX = state._strandX || [340];
+      strandX.forEach(x => {
+        ctx.beginPath(); ctx.moveTo(x, 155); ctx.lineTo(x, 460);
+        ctx.stroke();
+      });
     }
   }
+
+  // ─── KEYCHAIN CONNECTOR (ring + cords) ─────────────────────────────────────
+  drawKeychainConnector(ctx, state) {
+    const strandX   = state._strandX || [340];
+    const ringType  = state.ringType  || 'ring';
+    const ringColor = state.ringColor || '#F7A8C8';   // connector colour
+    const cordColor = state.strColor  || '#F7A8C8';   // cord colour
+    const ringCY    = 110;
+
+    ctx.save();
+    ctx.strokeStyle = ringColor;
+    ctx.fillStyle   = 'transparent';
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+
+    // ── Draw the connector shape ──────────────────────────────────────────
+    switch (ringType) {
+
+      case 'heart': {
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        const hx = 340, hy = ringCY, hs = 22;
+        ctx.moveTo(hx, hy + hs * 0.5);
+        ctx.bezierCurveTo(hx + hs * 2, hy - hs * 1.2, hx + hs * 2.5, hy + hs * 0.8, hx, hy + hs * 2);
+        ctx.bezierCurveTo(hx - hs * 2.5, hy + hs * 0.8, hx - hs * 2, hy - hs * 1.2, hx, hy + hs * 0.5);
+        ctx.stroke();
+        ctx.strokeStyle = '#F8F7FA';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(hx - 7, hy + hs * 2 - 4);
+        ctx.lineTo(hx + 7, hy + hs * 2 - 4);
+        ctx.stroke();
+        break;
+      }
+
+      case 'carabiner': {
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.ellipse(340, ringCY + 10, 16, 28, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.save();
+        ctx.strokeStyle = '#F8F7FA';
+        ctx.lineWidth   = 7;
+        ctx.beginPath();
+        ctx.moveTo(340, ringCY + 38 - 6);
+        ctx.lineTo(340, ringCY + 38 + 4);
+        ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = ringColor;
+        ctx.lineWidth   = 3;
+        ctx.beginPath();
+        ctx.moveTo(332, ringCY + 38 - 2);
+        ctx.lineTo(340, ringCY + 34);
+        ctx.stroke();
+        break;
+      }
+
+      case 'ballchain': {
+        ctx.fillStyle = ringColor;
+        const balls = 10, ballR = 4, loopR = 20;
+        for (let i = 0; i < balls; i++) {
+          const a = (i / balls) * Math.PI * 2 - Math.PI / 2;
+          ctx.beginPath();
+          ctx.arc(340 + Math.cos(a) * loopR, ringCY + 10 + Math.sin(a) * loopR, ballR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+
+      default: // 'ring'
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(340, ringCY + 8, 22, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+    }
+
+    // ── Cords — use cordColor ─────────────────────────────────────────────
+    ctx.strokeStyle = cordColor;
+    const cordStartY = ringType === 'heart'     ? ringCY + 44 :
+                       ringType === 'carabiner' ? ringCY + 40 :
+                       ringType === 'ballchain' ? ringCY + 32 :
+                                                  ringCY + 30;
+
+    ctx.lineWidth = state.strType === 'Wire' ? 2 : 4;
+    if (state.strType === 'Chain') ctx.setLineDash([5, 5]);
+
+    strandX.forEach(x => {
+      ctx.beginPath();
+      ctx.moveTo(340, cordStartY);
+      ctx.quadraticCurveTo(340, 185, x, 195);
+      ctx.stroke();
+    });
+
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
 
   drawClasp(ctx, product, clasp, color) {
     if (clasp === 'none') return;
@@ -211,13 +350,11 @@ export class CanvasEngine {
     ctx.restore();
   }
 
-  // ─── FLAT FILL — pure solid color, nothing else ──────────────────────────
   outlineFill(ctx, pathFunc, color, R) {
     ctx.fillStyle = color;
     ctx.beginPath(); pathFunc(ctx, R); ctx.fill();
   }
 
-  // ─── SELECTION — thin flat pink ring only ───────────────────────────────────
   drawSelectionGlow(ctx, R) {
     ctx.save();
     ctx.strokeStyle = '#F7A8C8';
@@ -226,7 +363,6 @@ export class CanvasEngine {
     ctx.restore();
   }
 
-  // ─── FIGURE (real image) ────────────────────────────────────────────────────
   drawImageElement(ctx, el, R, isSelected) {
     const source = this.scaledCache.get(el.imgSrc) || this.imageCache.get(el.imgSrc);
     const D = 100;
@@ -244,11 +380,10 @@ export class CanvasEngine {
     ctx.rotate(-Math.atan2(tf.b, tf.a));
 
     const ringR  = 8;
-    const figTop = ringR; // figure top flush with ring bottom — no gap
+    const figTop = ringR;
 
     ctx.save();
 
-    // ── Dashed selection ring — same style as regular bead selection ────────
     if (isSelected) {
       ctx.strokeStyle = '#F7A8C8';
       ctx.lineWidth   = 2;
@@ -257,18 +392,15 @@ export class CanvasEngine {
       ctx.setLineDash([]);
     }
 
-    // ── Jump ring — always pink ─────────────────────────────────────────────
     ctx.strokeStyle = '#F7A8C8';
     ctx.lineWidth   = 2.5;
     ctx.beginPath(); ctx.arc(0, 0, ringR, 0, Math.PI * 2); ctx.stroke();
 
-    // ── Figure hangs directly below the ring ───────────────────────────────
     ctx.drawImage(source, -D/2, figTop, D, D);
 
     ctx.restore();
   }
 
-  // ─── ELEMENT DISPATCHER ─────────────────────────────────────────────────────
   drawElement(ctx, el, R, isSelected, isThumb = false, posAngle = 0) {
     if (el.useImg) { this.drawImageElement(ctx, el, R, isSelected && !isThumb); return; }
 
@@ -277,7 +409,6 @@ export class CanvasEngine {
     const color  = el.color  || '#FFFFFF';
     const detail = el.detail || '#FFFFFF';
 
-    // ── Letters — flat rounded rect or circle, no shadow, no highlight ───────
     if (el.isLetter) {
       const bg = el.ltrBg   || '#FFFFFF';
       const fg = el.ltrText || '#333344';
@@ -300,7 +431,6 @@ export class CanvasEngine {
       return;
     }
 
-    // ── Shapes — FLAT, no outlines, no shadows, no highlights ────────────────
     switch (el.shape) {
 
       case 'round':
@@ -409,7 +539,6 @@ export class CanvasEngine {
     }
   }
 
-  // ─── UTILITIES ──────────────────────────────────────────────────────────────
   roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
@@ -428,7 +557,6 @@ export class CanvasEngine {
     } catch { return hex; }
   }
 
-  // ─── THUMBNAILS ─────────────────────────────────────────────────────────────
   generateThumbnails(arr) {
     const c = document.createElement('canvas');
     c.width = c.height = 100;

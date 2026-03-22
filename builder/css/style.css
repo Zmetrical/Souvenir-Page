@@ -318,14 +318,15 @@ body {
 ══════════════════════════════════════════ */
 .setup-panel, .design-panel {
   background: var(--white);
-  border-right: 1px solid var(--grey-200);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0;
 }
-.setup-panel  { width: var(--setup-w);  }
-.design-panel { width: var(--design-w); }
+/* setup stays on the left */
+.setup-panel  { width: var(--setup-w);  border-right: 1px solid var(--grey-200); }
+/* design-panel is now on the RIGHT of the canvas */
+.design-panel { width: var(--design-w); border-left:  1px solid var(--grey-200); }
 
 .setup-inner, .design-inner {
   display: flex; flex-direction: column; flex: 1;
@@ -337,17 +338,24 @@ body {
 /* ══════════════════════════════════════════
    INSPECTOR
 ══════════════════════════════════════════ */
-.insp-section { border-bottom: 1px solid var(--grey-200); flex-shrink: 0; }
+.insp-section {
+  border-bottom: 1px solid var(--grey-200);
+  flex-shrink: 0;
+  min-height: 168px;   /* fixed baseline — list never shifts on select/deselect */
+  overflow: hidden;
+}
 .insp-empty {
   font-size: .72rem; font-weight: 600;
   color: var(--ink3);
-  padding: 16px 14px;
+  padding: 0 14px;
   background: var(--white);
   line-height: 1.65;
   text-align: center;
+  height: 128px;       /* 168px total − 40px phead */
+  display: flex; align-items: center; justify-content: center;
 }
 .insp-content {
-  padding: 12px 14px;
+  padding: 10px 14px;
   background: var(--white);
 }
 .insp-top     { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
@@ -405,11 +413,14 @@ body {
   border: 1.5px solid var(--grey-200);
   border-radius: var(--r-sm);
   padding: 5px 8px;
-  cursor: pointer;
+  cursor: grab;
   transition: background .12s, border-color .12s;
+  user-select: none;
 }
 .ditem:hover    { background: var(--grey-50); }
 .ditem.selected { background: var(--pink-lt); border-color: var(--pink-bd); }
+.ditem.drag-over { border-color: var(--teal); background: var(--teal-lt); }
+.ditem.dragging  { opacity: .4; cursor: grabbing; }
 
 .di-num   { font-family: var(--fb); font-size: .54rem; font-weight: 800; color: var(--ink4); min-width: 14px; text-align: center; }
 .di-thumb {
@@ -546,7 +557,7 @@ body {
 .rpanel {
   width: var(--right-w); min-width: var(--right-w);
   background: var(--white);
-  border-left: 1px solid var(--grey-200);
+  border-right: 1px solid var(--grey-200);
   display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
 }
 .rhead {
@@ -616,7 +627,11 @@ body {
 /* ── Element Grid ── */
 .lgrid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
-  padding: 9px 8px; overflow-y: auto; flex: 1;
+  padding: 9px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
   background: var(--white);
 }
 .ecard {
@@ -651,8 +666,15 @@ body {
   flex-shrink: 0; background: var(--white);
 }
 .lgrid-ltrs {
-  display: grid; grid-template-columns: repeat(5,1fr); gap: 5px;
-  padding: 9px 7px; overflow-y: auto; flex: 1; background: var(--white);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 5px;
+  padding: 9px 7px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  background: var(--white);
+  min-height: 0;
 }
 .lbtn {
   aspect-ratio: 1;
@@ -671,8 +693,14 @@ body {
    BEAD GROUPS
 ══════════════════════════════════════════ */
 .bead-groups {
-  overflow-y: auto; flex: 1; padding: 7px 8px;
-  display: flex; flex-direction: column; gap: 5px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   background: var(--white);
 }
 .bgroup {
@@ -854,3 +882,62 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--grey-300); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--pink); }
+
+/* ══════════════════════════════════════════
+   BUILDER NAV (topbar page switcher)
+══════════════════════════════════════════ */
+.topbar-l {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.builder-nav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.bnav-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  font-family: var(--fb);
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--ink3);
+  text-decoration: none;
+  border: 1.5px solid transparent;
+  transition: color .13s, background .13s, border-color .13s;
+  white-space: nowrap;
+}
+.bnav-link:hover {
+  background: var(--grey-50);
+  color: var(--ink2);
+  border-color: var(--grey-200);
+}
+.bnav-link.active {
+  background: var(--pink-lt);
+  color: var(--pink-dk);
+  border-color: var(--pink-bd);
+}
+.bnav-icon {
+  font-size: .8rem;
+  line-height: 1;
+}
+/* ══════════════════════════════════════════
+   KEYCHAIN STRAND BADGE (design list)
+══════════════════════════════════════════ */
+.di-strand-badge {
+  font-size: .54rem;
+  font-weight: 800;
+  background: var(--teal-lt);
+  color: var(--teal-dk);
+  border: 1px solid var(--teal-bd);
+  border-radius: var(--r-xs);
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}

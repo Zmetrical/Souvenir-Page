@@ -1,9 +1,19 @@
 export class State {
   constructor(appInstance) {
-    this.app         = appInstance;
-    this.product     = 'bracelet';
-    this.basePrice   = 80;
-    this.maxBeads    = 20;
+    this.app = appInstance;
+
+    // ── Per-page product config injected by each HTML before main.js loads ──
+    const cfg = window.BUILDER_PRODUCT || {};
+    this.product    = cfg.product   || 'bracelet';
+    this.basePrice  = cfg.basePrice || 80;
+    this.maxBeads   = cfg.maxBeads  || 20;
+
+    // ── Keychain-specific ───────────────────────────────────────────────────
+    this.keychainStrands = 1;   // 1 | 2 | 3
+    this.activeStrand    = 0;   // which strand new elements are added to
+    this.ringType        = 'ring'; // 'ring' | 'heart' | 'carabiner' | 'ballchain'
+    this.ringColor       = '#F7A8C8'; // connector colour (keychain only)
+
     this.strColor    = '#F9B8CF';
     this.strType     = 'Elastic';
     this.view        = 'silhouette';
@@ -11,7 +21,7 @@ export class State {
     this.elems       = [];
     this.selectedId  = null;
     this.ltrColor    = { bg: '#ffffff', text: '#333344' };
-    this.letterShape = 'square'; // 'square' | 'round' — square is default like reference
+    this.letterShape = 'square';
     this.addDirection = 'right';
     this.history     = [];
     this.future      = [];

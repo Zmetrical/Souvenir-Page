@@ -1,4 +1,4 @@
-import { BEADS, CHARMS, FIGURES } from './data.js';
+import { BEADS, FIGURES, CHARMS } from './data.js';
 import { State } from './state.js';
 import { CanvasEngine } from './canvasengine.js';
 import { UIController } from './uicontroller.js';
@@ -8,28 +8,25 @@ class App {
     this.state = new State(this);
     this.canvasEngine = new CanvasEngine();
     this.ui = new UIController(this);
-
-    // Kick off async init — preload figure images first, then build UI
     this._init();
   }
 
   async _init() {
-    // 1. Preload all real figure images into the engine's cache
-    await this.canvasEngine.preloadImages(FIGURES);
+    // 1. Preload real images (CHARMS are image-based)
+    await this.canvasEngine.preloadImages(CHARMS);
 
-    // 2. Set imgUrl for figures from their imgSrc (used by library cards & inspector)
-    FIGURES.forEach(el => {
-      // Generate a proper canvas thumbnail now that the image is in cache
-      el.imgUrl = this.canvasEngine.generateFigureThumb(el);
+    // 2. Generate thumbnails for image-based charms
+    CHARMS.forEach(el => {
+      if (el.useImg) el.imgUrl = this.canvasEngine.generateFigureThumb(el);
     });
 
-    // 3. Generate canvas thumbnails for beads & charms (drawn shapes, sync)
-    this.canvasEngine.generateThumbnails([...BEADS, ...CHARMS]);
+    // 3. Generate canvas thumbnails for beads + shaped figures
+    this.canvasEngine.generateThumbnails([...BEADS, ...FIGURES]);
 
-    // 4. Build library grids
+    // 4. Build library panels
     this.ui.buildBeadsPanel(BEADS);
-    this.ui.buildGrid('grid-charms',   CHARMS);
-    this.ui.buildGrid('grid-figures',  FIGURES, true); // true = is figures tab
+    this.ui.buildFiguresGrid(FIGURES);   // Figures tab — shaped decorative charms
+    this.ui.buildCharmsGrid(CHARMS);     // Charms tab — image-based series
     this.ui.buildLetters();
 
     // 5. First render
@@ -38,10 +35,6 @@ class App {
 
   render() {
     const mainCanvas = document.getElementById('main-canvas');
-
-    // ── DPR scaling: make canvas pixel-perfect on retina/HiDPI screens ──
-    // The canvas logical size stays 680×480 (CSS), but its internal pixel
-    // buffer is scaled up by devicePixelRatio so characters look crisp.
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const W = 680, H = 480;
     if (mainCanvas.width !== W * dpr || mainCanvas.height !== H * dpr) {
@@ -52,7 +45,6 @@ class App {
       const ctx = mainCanvas.getContext('2d');
       ctx.scale(dpr, dpr);
     }
-
     this.canvasEngine.draw(mainCanvas, this.state, true);
     this.ui.updateAll();
   }
