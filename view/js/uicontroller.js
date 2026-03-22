@@ -1,4 +1,4 @@
-import { BEADS, CHARMS, FIGURES, ELEM_MAP } from './Data.js';
+import { BEADS, CHARMS, FIGURES, ELEM_MAP } from './data.js';
 
 export class UIController {
   constructor(appInstance) {
@@ -6,8 +6,7 @@ export class UIController {
     this.setupOpen = true;
     this.designOpen = true;
     this.toastTimer = null;
-    
-    // Drag and Drop State
+
     this.isDragging = false;
     this.draggedUid = null;
     this.dragStartIndex = -1;
@@ -18,17 +17,12 @@ export class UIController {
 
   setupListeners() {
     const mainCanvas = document.getElementById('main-canvas');
-    
-    // Replace standard click with Drag & Drop Mouse Handlers
     mainCanvas.addEventListener('mousedown', (e) => this.handleDragStart(e, mainCanvas));
     mainCanvas.addEventListener('mousemove', (e) => this.handleDragMove(e, mainCanvas));
     window.addEventListener('mouseup', (e) => this.handleDragEnd(e));
 
-    // Close modals on overlay click
     document.querySelectorAll('.overlay').forEach(m => {
-      m.addEventListener('click', e => {
-        if (e.target === m) m.classList.remove('open');
-      });
+      m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
     });
   }
 
@@ -39,35 +33,27 @@ export class UIController {
 
     const state = this.app.state;
     if (!state.elems.length) return;
-    
+
     const positions = this.app.canvasEngine.getPositions(state);
     let hit = null;
-    
-    // Find if a bead was clicked
+
     for (let i = state.elems.length - 1; i >= 0; i--) {
       const pos = positions[i];
-      const R = (state.elems[i].small ? 14 : state.elems[i].large ? 28 : 22) + 6;
-      if ((mx - pos.x) ** 2 + (my - pos.y) ** 2 <= R ** 2) { 
-        hit = state.elems[i].uid; 
-        break; 
-      }
+      // For useImg figures, hit area covers the full hanging body (D/2 = 50px)
+      const R = state.elems[i].useImg ? 50 : (state.elems[i].small ? 14 : state.elems[i].large ? 28 : 22) + 6;
+      if ((mx - pos.x) ** 2 + (my - pos.y) ** 2 <= R ** 2) { hit = state.elems[i].uid; break; }
     }
 
     if (hit) {
-      // Save the state BEFORE dragging starts in case we need to push it to undo history later
       this.dragInitialState = JSON.stringify(state.elems);
-      
       this.isDragging = true;
       this.draggedUid = hit;
       this.dragStartIndex = state.elems.findIndex(el => el.uid === hit);
-      
       state.selectedId = hit;
-      canvas.style.cursor = 'grabbing'; // UX detail
-      
+      canvas.style.cursor = 'grabbing';
       this.updateInspector(state.elems[this.dragStartIndex]);
       this.app.render();
     } else {
-      // Clicked empty space, deselect
       state.selectedId = null;
       this.updateInspector(null);
       this.app.render();
@@ -76,50 +62,37 @@ export class UIController {
 
   handleDragMove(e, canvas) {
     if (!this.isDragging || !this.draggedUid) return;
-
     const rect = canvas.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
     const my = (e.clientY - rect.top) * (canvas.height / rect.height);
 
     const state = this.app.state;
     const positions = this.app.canvasEngine.getPositions(state);
+    let closestIdx = -1, minDist = Infinity;
 
-    let closestIdx = -1;
-    let minDist = Infinity;
-
-    // Find the bead slot closest to the mouse cursor
     for (let i = 0; i < positions.length; i++) {
       const dist = (mx - positions[i].x) ** 2 + (my - positions[i].y) ** 2;
-      if (dist < minDist) {
-        minDist = dist;
-        closestIdx = i;
-      }
+      if (dist < minDist) { minDist = dist; closestIdx = i; }
     }
 
     const currIdx = state.elems.findIndex(el => el.uid === this.draggedUid);
-
-    // If mouse is near a different slot, reorder array and re-render instantly!
     if (closestIdx !== -1 && closestIdx !== currIdx) {
       const [movedItem] = state.elems.splice(currIdx, 1);
       state.elems.splice(closestIdx, 0, movedItem);
-      this.app.render(); 
+      this.app.render();
     }
   }
 
   handleDragEnd(e) {
     if (this.isDragging) {
       document.getElementById('main-canvas').style.cursor = 'pointer';
-      
       const state = this.app.state;
       const finalIdx = state.elems.findIndex(el => el.uid === this.draggedUid);
-      
-      // Only record an undo history state if the item was ACTUALLY dropped in a new location
       if (finalIdx !== this.dragStartIndex && finalIdx !== -1) {
         state.history.push(this.dragInitialState);
         state.future = [];
         this.updateHistoryButtons();
       }
-      
       this.isDragging = false;
       this.draggedUid = null;
     }
@@ -137,7 +110,6 @@ export class UIController {
     document.getElementById('bead-ct').textContent = state.elems.length;
     document.getElementById('bead-max').textContent = state.maxBeads;
     document.getElementById('price-disp').textContent = `₱${state.basePrice + ec}`;
-    
     const emptyOver = document.getElementById('empty-over');
     if (emptyOver) emptyOver.style.display = state.elems.length ? 'none' : 'flex';
   }
@@ -148,74 +120,55 @@ export class UIController {
     document.getElementById('btn-redo').disabled = !state.future.length;
   }
 
-// --- COMPONENT ACTIONS ---
-// --- COMPONENT ACTIONS ---
   addElement(id) {
     const item = ELEM_MAP[id];
     if (!item) return;
-    if (this.app.state.elems.length >= this.app.state.maxBeads) { 
-      this.showToast('Max elements reached!'); 
-      return; 
-    }
+    if (this.app.state.elems.length >= this.app.state.maxBeads) { this.showToast('Max elements reached!'); return; }
     this.app.state.pushHistory();
-    
+
     const newEl = { uid: this.app.state.generateId(), ...item };
-    
-    // INTUITIVE LOGIC: Insert after the currently selected bead
     const selectedIdx = this.app.state.elems.findIndex(e => e.uid === this.app.state.selectedId);
-    
     if (selectedIdx !== -1) {
       this.app.state.elems.splice(selectedIdx + 1, 0, newEl);
     } else {
-      this.app.state.elems.push(newEl); // Default to adding at the end if nothing is selected
+      this.app.state.elems.push(newEl);
     }
-    
-    // Auto-select the newly added bead so you can chain additions rapidly
+
     this.app.state.selectedId = newEl.uid;
     this.updateInspector(newEl);
-    
-    this.app.render(); 
+    this.app.render();
     this.showToast(`Added ${item.name}`);
   }
 
   addLetter(ch) {
-    if (this.app.state.elems.length >= this.app.state.maxBeads) { 
-      this.showToast('Max elements reached!'); 
-      return; 
-    }
+    if (this.app.state.elems.length >= this.app.state.maxBeads) { this.showToast('Max elements reached!'); return; }
     this.app.state.pushHistory();
-    
+
     const letterEl = {
-      uid: this.app.state.generateId(), 
-      id: 'letter_' + ch, 
-      name: 'Letter ' + ch, 
+      uid: this.app.state.generateId(),
+      id: 'letter_' + ch,
+      name: 'Letter ' + ch,
       isLetter: true,
-      ltrBg: this.app.state.ltrColor.bg, 
-      ltrText: this.app.state.ltrColor.text, 
+      letterShape: this.app.state.letterShape || 'round',
+      ltrBg: this.app.state.ltrColor.bg,
+      ltrText: this.app.state.ltrColor.text,
       label: ch,
-      price: 8, 
-      stock: 'in', 
-      category: 'letters'
+      price: 8, stock: 'in', category: 'letters'
     };
-    
+
     letterEl.imgUrl = this.app.canvasEngine.createSingleThumb(letterEl);
-    
-    // INTUITIVE LOGIC: Insert after the currently selected bead
     const selectedIdx = this.app.state.elems.findIndex(e => e.uid === this.app.state.selectedId);
-    
     if (selectedIdx !== -1) {
       this.app.state.elems.splice(selectedIdx + 1, 0, letterEl);
     } else {
-      this.app.state.elems.push(letterEl); // Default to adding at the end if nothing is selected
+      this.app.state.elems.push(letterEl);
     }
-    
-    // Auto-select the newly added letter so you can type full words in order
+
     this.app.state.selectedId = letterEl.uid;
     this.updateInspector(letterEl);
-    
     this.app.render();
   }
-  // NEW FUNCTION: Handle the toggle button click
+
   setAddDir(dir, btnEl) {
     this.app.state.addDirection = dir;
     document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
@@ -225,23 +178,17 @@ export class UIController {
   removeBead(uid) {
     this.app.state.pushHistory();
     this.app.state.elems = this.app.state.elems.filter(e => e.uid !== uid);
-    if (this.app.state.selectedId === uid) { 
-      this.app.state.selectedId = null; 
-      this.updateInspector(null); 
-    }
+    if (this.app.state.selectedId === uid) { this.app.state.selectedId = null; this.updateInspector(null); }
     this.app.render();
   }
 
   dupeBead(uid) {
-    if (this.app.state.elems.length >= this.app.state.maxBeads) { 
-      this.showToast('Max elements reached!'); 
-      return; 
-    }
+    if (this.app.state.elems.length >= this.app.state.maxBeads) { this.showToast('Max elements reached!'); return; }
     const idx = this.app.state.elems.findIndex(e => e.uid === uid);
     if (idx < 0) return;
     this.app.state.pushHistory();
     this.app.state.elems.splice(idx + 1, 0, { ...this.app.state.elems[idx], uid: this.app.state.generateId() });
-    this.app.render(); 
+    this.app.render();
     this.showToast('Duplicated!');
   }
 
@@ -262,7 +209,6 @@ export class UIController {
     this.app.render();
   }
 
-  // --- RENDER DOM LISTS ---
   renderDesignList() {
     const state = this.app.state;
     const list = document.getElementById('design-list');
@@ -271,14 +217,14 @@ export class UIController {
 
     if (!state.elems.length) {
       list.innerHTML = `<div class="dempty"><div class="dempty-icon">✽</div>No elements yet.<br>Pick from the library →</div>`;
-      foot.style.display = 'none'; 
+      foot.style.display = 'none';
       return;
     }
 
     list.innerHTML = state.elems.map((el, i) => `
       <div class="ditem${state.selectedId === el.uid ? ' selected' : ''}" onclick="app.ui.selectBead('${el.uid}')">
         <span class="di-num">${i + 1}</span>
-        <div class="di-thumb"><img src="${el.imgUrl}"/></div>
+        <div class="di-thumb${el.useImg ? ' figure' : ''}"><img src="${el.imgUrl}"/></div>
         <span class="di-name" title="${el.name}">${el.name}</span>
         <span class="di-price">₱${el.price || 8}</span>
         <div class="di-actions">
@@ -296,10 +242,16 @@ export class UIController {
       <div class="dfoot-total"><span>Total Est.</span><span style="color:var(--ink)">₱${state.basePrice + ec}</span></div>`;
   }
 
-  buildGrid(gridId, items) {
+  // ─── UPDATED buildGrid ───────────────────────────────────────────────────────
+  // isFigure = true → adds class="figure" to the card so CSS targets it
+  buildGrid(gridId, items, isFigure = false) {
     document.getElementById(gridId).innerHTML = items.map(item => `
-      <div class="ecard${item.stock === 'out' ? ' out' : ''}" onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}" title="${item.name}">
-        <div class="eprev-img"><img src="${item.imgUrl}" alt="${item.name}"/></div>
+      <div class="ecard${isFigure ? ' figure' : ''}${item.stock === 'out' ? ' out' : ''}"
+           onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
+           title="${item.name}">
+        <div class="eprev-img">
+          <img src="${item.imgUrl}" alt="${item.name}"/>
+        </div>
         <div class="ename">${item.name}</div>
         <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
       </div>`).join('');
@@ -307,20 +259,28 @@ export class UIController {
 
   buildLetters() {
     const state = this.app.state;
+    // Square or round letter style toggle
+    const isSquare = state.letterShape === 'square';
     document.getElementById('grid-ltrs').innerHTML = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'].map(ch => `
-      <div class="lbtn" onclick="app.ui.addLetter('${ch}')" style="background:${state.ltrColor.bg};color:${state.ltrColor.text};">${ch}</div>`).join('');
+      <div class="lbtn" onclick="app.ui.addLetter('${ch}')"
+           style="background:${state.ltrColor.bg};color:${state.ltrColor.text};
+                  border-radius:${isSquare ? '8px' : '50%'};">${ch}</div>`).join('');
+  }
+
+  setLetterShape(shape, btnEl) {
+    this.app.state.letterShape = shape;
+    document.querySelectorAll('.lshape-btn').forEach(b => b.classList.remove('active'));
+    btnEl.classList.add('active');
+    this.buildLetters();
   }
 
   updateInspector(el) {
     const b = document.getElementById('insp-body');
-    if (!el) { 
-      b.innerHTML = '<div class="insp-empty">Click any element on the canvas to edit</div>'; 
-      return; 
-    }
+    if (!el) { b.innerHTML = '<div class="insp-empty">Click any element on the canvas to edit</div>'; return; }
     b.innerHTML = `
       <div class="insp-content">
         <div class="insp-top">
-          <div class="insp-thumb"><img src="${el.imgUrl}"/></div>
+          <div class="insp-thumb${el.useImg ? ' figure' : ''}"><img src="${el.imgUrl}"/></div>
           <div class="insp-name">${el.name}</div>
           <span class="insp-price-badge">₱${el.price || 8}</span>
         </div>
@@ -335,65 +295,53 @@ export class UIController {
       </div>`;
   }
 
-  // --- CONFIG TOGGLERS ---
-  setProduct(el) { 
-    this.app.state.product = el.dataset.prod; 
-    this.app.state.basePrice = +el.dataset.price; 
-    this.app.state.maxBeads = +el.dataset.max; 
-    document.querySelectorAll('.tpill').forEach(p => p.classList.remove('active')); 
-    el.classList.add('active'); 
-    this.app.render(); 
+  setProduct(el) {
+    this.app.state.product = el.dataset.prod;
+    this.app.state.basePrice = +el.dataset.price;
+    this.app.state.maxBeads = +el.dataset.max;
+    document.querySelectorAll('.tpill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    this.app.render();
   }
-  setStrCol(col, el) { 
-    this.app.state.strColor = col; 
-    document.querySelectorAll('#str-sw .sw').forEach(s => s.classList.remove('active')); 
-    el.classList.add('active'); 
-    this.app.render(); 
+  setStrCol(col, el) {
+    this.app.state.strColor = col;
+    document.querySelectorAll('#str-sw .sw').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    this.app.render();
   }
-  setStrType(type) { 
-    this.app.state.strType = type; 
-    this.app.render(); 
+  setStrType(type) { this.app.state.strType = type; this.app.render(); }
+  setLtrCol(bg, text, el) {
+    this.app.state.ltrColor = { bg, text };
+    document.querySelectorAll('#ltr-sw .sw').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    this.buildLetters();
   }
-  setLtrCol(bg, text, el) { 
-    this.app.state.ltrColor = { bg, text }; 
-    document.querySelectorAll('#ltr-sw .sw').forEach(s => s.classList.remove('active')); 
-    el.classList.add('active'); 
-    this.buildLetters(); 
+  setClasp(c, el) {
+    this.app.state.clasp = c;
+    document.querySelectorAll('.cpill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    this.app.render();
   }
-  setClasp(c, el) { 
-    this.app.state.clasp = c; 
-    document.querySelectorAll('.cpill').forEach(p => p.classList.remove('active')); 
-    el.classList.add('active'); 
-    this.app.render(); 
-  }
-  setView(v) { 
-    this.app.state.view = v; 
-    document.getElementById('vt-sil').classList.toggle('active', v === 'silhouette'); 
-    document.getElementById('vt-flat').classList.toggle('active', v === 'flatlay'); 
+  setView(v) {
+    this.app.state.view = v;
+    document.getElementById('vt-sil').classList.toggle('active', v === 'silhouette');
+    document.getElementById('vt-flat').classList.toggle('active', v === 'flatlay');
     document.getElementById('canvas-surface').classList.toggle('show', v === 'flatlay');
-    this.app.render(); 
+    this.app.render();
   }
 
-  toggleSetup() { 
-    this.setupOpen = !this.setupOpen; 
-    document.getElementById('setup-panel').classList.toggle('collapsed', !this.setupOpen); 
-  }
-  toggleDesign() { 
-    this.designOpen = !this.designOpen; 
-    document.getElementById('design-panel').classList.toggle('collapsed', !this.designOpen); 
-  }
-  toggleSec(id) { 
-    document.getElementById(id).classList.toggle('open'); 
-  }
-  
-  switchTab(el) { 
-    const tab = el.dataset.tab; 
-    ['beads','charms','figures','letters'].forEach(t => { 
-      const el2 = document.getElementById('tab-' + t); 
-      if(el2) el2.style.display = t === tab ? 'flex' : 'none'; 
-    }); 
-    document.querySelectorAll('.ltab').forEach(t => t.classList.remove('active')); 
-    el.classList.add('active'); 
+  toggleSetup() { this.setupOpen = !this.setupOpen; document.getElementById('setup-panel').classList.toggle('collapsed', !this.setupOpen); }
+  toggleDesign() { this.designOpen = !this.designOpen; document.getElementById('design-panel').classList.toggle('collapsed', !this.designOpen); }
+  toggleSec(id) { document.getElementById(id).classList.toggle('open'); }
+
+  switchTab(el) {
+    const tab = el.dataset.tab;
+    ['beads','charms','figures','letters'].forEach(t => {
+      const el2 = document.getElementById('tab-' + t);
+      if (el2) el2.style.display = t === tab ? 'flex' : 'none';
+    });
+    document.querySelectorAll('.ltab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
   }
 
   filterLib(input) {
@@ -403,15 +351,10 @@ export class UIController {
     });
   }
 
-  // --- EXPORT & MODALS ---
   renderToCanvas(targetCanvas, W, H) {
-    targetCanvas.width = W; 
-    targetCanvas.height = H;
+    targetCanvas.width = W; targetCanvas.height = H;
     const ctx = targetCanvas.getContext('2d');
-    ctx.fillStyle = '#FFFFFF'; 
-    ctx.fillRect(0, 0, W, H);
-    
-    // Temporarily disable interactive hover states for clean export
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H);
     const previousSelection = this.app.state.selectedId;
     this.app.state.selectedId = null;
     this.app.canvasEngine.draw(targetCanvas, this.app.state, false);
@@ -420,22 +363,22 @@ export class UIController {
 
   exportDesign() {
     if (!this.app.state.elems.length) { this.showToast('Add some elements first!'); return; }
-    const ec = document.createElement('canvas'); 
+    const ec = document.createElement('canvas');
     this.renderToCanvas(ec, 680, 480);
-    const link = document.createElement('a'); 
-    link.download = `artsycrate-design-${Date.now()}.png`; 
-    link.href = ec.toDataURL('image/png'); 
-    link.click(); 
+    const link = document.createElement('a');
+    link.download = `artsycrate-design-${Date.now()}.png`;
+    link.href = ec.toDataURL('image/png');
+    link.click();
     this.showToast('Design exported!');
   }
 
   downloadDesign() {
-    const ec = document.createElement('canvas'); 
+    const ec = document.createElement('canvas');
     this.renderToCanvas(ec, 680, 480);
-    const link = document.createElement('a'); 
-    link.download = `artsycrate-design-${Date.now()}.png`; 
-    link.href = ec.toDataURL('image/png'); 
-    link.click(); 
+    const link = document.createElement('a');
+    link.download = `artsycrate-design-${Date.now()}.png`;
+    link.href = ec.toDataURL('image/png');
+    link.click();
     this.showToast('Downloaded!');
   }
 
@@ -462,7 +405,7 @@ export class UIController {
     const lenVal = document.getElementById('length-sel').value;
     const lenMap = { small: '16cm', medium: '18cm', large: '20cm', custom: 'Custom' };
     const prodMap = { bracelet: 'Bracelet', necklace: 'Necklace', keychain: 'Keychain' };
-    
+
     document.getElementById('os-prod').textContent = `${prodMap[state.product]} · ${lenMap[lenVal]}`;
     document.getElementById('os-base').textContent = `₱${state.basePrice}`;
     document.getElementById('os-elems').textContent = `${state.elems.length} elements`;
@@ -476,20 +419,18 @@ export class UIController {
     }
   }
 
-  closeModal(id) { 
-    document.getElementById(id).classList.remove('open'); 
-  }
-  
-  submitOrder() { 
-    this.showToast('Order submitted! We will message you soon.'); 
-    this.closeModal('order-modal'); 
+  closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  submitOrder() {
+    this.showToast('Order submitted! We will message you soon.');
+    this.closeModal('order-modal');
   }
 
-  showToast(msg) { 
-    const t = document.getElementById('toast'); 
-    t.textContent = msg; 
-    t.classList.add('show'); 
-    clearTimeout(this.toastTimer); 
-    this.toastTimer = setTimeout(() => t.classList.remove('show'), 2600); 
+  showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
   }
 }

@@ -2,221 +2,193 @@ export class CanvasEngine {
   constructor() {
     this.PATHS = {
       bracelet: { cx: 340, cy: 240, rx: 190, ry: 110 },
-      necklace: null, 
+      necklace: null,
       keychain: null,
     };
+    this.imageCache  = new Map();
+    this.scaledCache = new Map();
   }
 
-  // Calculate coordinates for beads packed tightly together
+  // ─── IMAGE PRELOADER ────────────────────────────────────────────────────────
+  preloadImages(figuresArray) {
+    const promises = figuresArray
+      .filter(el => el.useImg && el.imgSrc)
+      .map(el => new Promise(resolve => {
+        if (this.imageCache.has(el.imgSrc)) { resolve(); return; }
+        const img = new Image();
+        img.onload  = () => { this.imageCache.set(el.imgSrc, img); this._bakeScaled(el.imgSrc, img); resolve(); };
+        img.onerror = () => { resolve(); };
+        img.src = el.imgSrc;
+      }));
+    return Promise.all(promises);
+  }
+
+  _bakeScaled(key, img) {
+    const dpr  = Math.min(window.devicePixelRatio || 1, 3);
+    const size = Math.max(img.naturalWidth, img.naturalHeight, 300);
+    const c    = document.createElement('canvas');
+    c.width    = size * dpr;
+    c.height   = size * dpr;
+    const ctx  = c.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.scale(dpr, dpr);
+    ctx.drawImage(img, 0, 0, size, size);
+    this.scaledCache.set(key, c);
+  }
+
+  // ─── POSITIONS ──────────────────────────────────────────────────────────────
   getPositions(state) {
     const elems = state.elems;
     const count = elems.length;
     if (!count) return [];
 
-    // Calculate physical radius for every bead (+1px for a tiny natural gap)
-    const radii = elems.map(el => (el.small ? 14 : (el.large ? 28 : 22)) + 1);
+    const radii = elems.map(el =>
+      (el.useImg ? 14 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22) + 1
+    );
 
-    // 1. FLATLAY (Straight horizontal line packed from the center)
     if (state.view === 'flatlay') {
-      const totalWidth = radii.reduce((sum, r) => sum + r * 2, 0);
-      let currentX = 340 - (totalWidth / 2) + radii[0];
-      const y = 240;
-      
+      const totalWidth = radii.reduce((s, r) => s + r * 2, 0);
+      let x = 340 - totalWidth / 2 + radii[0];
       return elems.map((el, i) => {
-        const pos = { x: currentX, y: y, angle: 90 };
-        if (i < count - 1) currentX += radii[i] + radii[i+1];
+        const pos = { x, y: 240, angle: 90 };
+        if (i < count - 1) x += radii[i] + radii[i + 1];
         return pos;
       });
     }
 
-    // 2. BRACELET (Packed tightly at the bottom center of the ellipse)
     if (state.product === 'bracelet') {
       const { cx, cy, rx, ry } = this.PATHS.bracelet;
-      
-      // Calculate angular width needed for all beads combined
-      const angles = radii.map(r => (r * 2) / rx);
-      const totalAngle = angles.reduce((sum, a) => sum + a, 0);
-      
-      // Start from the bottom (PI/2) and shift left by half the total width
-      let currentT = (Math.PI / 2) - (totalAngle / 2) + (angles[0] / 2); 
-      
+      const angles     = radii.map(r => (r * 2) / rx);
+      const totalAngle = angles.reduce((s, a) => s + a, 0);
+      let t = Math.PI / 2 - totalAngle / 2 + angles[0] / 2;
       return elems.map((el, i) => {
-        const pos = { 
-          x: cx + rx * Math.cos(currentT), 
-          y: cy + ry * Math.sin(currentT), 
-          angle: currentT * 180 / Math.PI + 90 
-        };
-        if (i < count - 1) currentT += (angles[i] / 2) + (angles[i+1] / 2);
+        const pos = { x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t), angle: t * 180 / Math.PI + 90 };
+        if (i < count - 1) t += angles[i] / 2 + angles[i + 1] / 2;
         return pos;
       });
     }
 
-    // 3. NECKLACE (Packed tightly at the bottom center of the bezier curve)
     if (state.product === 'necklace') {
-      const approxLength = 800; // rough pixel length of the bezier curve
-      const totalWidth = radii.reduce((sum, r) => sum + r * 2, 0);
-      let currentT = 0.5 - (totalWidth / approxLength / 2);
-      
+      const approxLen  = 800;
+      const totalWidth = radii.reduce((s, r) => s + r * 2, 0);
+      let t = 0.5 - totalWidth / approxLen / 2;
       return elems.map((el, i) => {
-        const { x, y, dx, dy } = this.bezierPoint(60, 80, 60, 420, 620, 420, 620, 80, currentT);
+        const { x, y, dx, dy } = this.bezierPoint(60, 80, 60, 420, 620, 420, 620, 80, t);
         const pos = { x, y, angle: Math.atan2(dy, dx) * 180 / Math.PI };
-        if (i < count - 1) currentT += (radii[i] + radii[i+1]) / approxLength;
+        if (i < count - 1) t += (radii[i] + radii[i + 1]) / approxLen;
         return pos;
       });
     }
 
-    // 4. KEYCHAIN (Packed tightly going downwards)
     if (state.product === 'keychain') {
-      let currentY = 190 + radii[0];
-      const x = 340;
+      let y = 190 + radii[0];
       return elems.map((el, i) => {
-        const pos = { x, y: currentY, angle: 90 };
-        if (i < count - 1) currentY += radii[i] + radii[i+1];
+        const pos = { x: 340, y, angle: 90 };
+        if (i < count - 1) y += radii[i] + radii[i + 1];
         return pos;
       });
     }
-    
+
     return [];
   }
 
   bezierPoint(x0, y0, x1, y1, x2, y2, x3, y3, t) {
     const mt = 1 - t;
-    const x = mt * mt * mt * x0 + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3;
-    const y = mt * mt * mt * y0 + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3;
+    const x  = mt*mt*mt*x0 + 3*mt*mt*t*x1 + 3*mt*t*t*x2 + t*t*t*x3;
+    const y  = mt*mt*mt*y0 + 3*mt*mt*t*y1 + 3*mt*t*t*y2 + t*t*t*y3;
     const dt = 0.001; const t2 = Math.min(t + dt, 1); const mt2 = 1 - t2;
     return {
       x, y,
-      dx: (mt2 * mt2 * mt2 * x0 + 3 * mt2 * mt2 * t2 * x1 + 3 * mt2 * t2 * t2 * x2 + t2 * t2 * t2 * x3) - x,
-      dy: (mt2 * mt2 * mt2 * y0 + 3 * mt2 * mt2 * t2 * y1 + 3 * mt2 * t2 * t2 * y2 + t2 * t2 * t2 * y3) - y
+      dx: (mt2*mt2*mt2*x0 + 3*mt2*mt2*t2*x1 + 3*mt2*t2*t2*x2 + t2*t2*t2*x3) - x,
+      dy: (mt2*mt2*mt2*y0 + 3*mt2*mt2*t2*y1 + 3*mt2*t2*t2*y2 + t2*t2*t2*y3) - y
     };
   }
 
-  // Core Drawing Loop
+  // ─── CORE DRAW ──────────────────────────────────────────────────────────────
   draw(canvas, state, interactive = true) {
     const ctx = canvas.getContext('2d');
-    const W = canvas.width;
-    const H = canvas.height;
+    const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     const flat = state.view === 'flatlay';
 
     if (flat) {
       ctx.save();
       ctx.fillStyle = '#FFFFFF';
-      this.roundRect(ctx, 20, 20, W - 40, H - 40, 18); 
-      ctx.fill();
-      ctx.strokeStyle = '#111118'; ctx.lineWidth = 4;
-      this.roundRect(ctx, 20, 20, W - 40, H - 40, 18); 
-      ctx.stroke();
+      this.roundRect(ctx, 20, 20, W - 40, H - 40, 18); ctx.fill();
       ctx.restore();
     }
 
-    // String Guide
+    // Guide line
     ctx.save();
-    ctx.strokeStyle = 'rgba(17,17,24,.15)'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
+    ctx.strokeStyle = 'rgba(180,180,210,.3)';
+    ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
     this.drawProductPath(ctx, state); ctx.stroke();
     ctx.setLineDash([]); ctx.restore();
 
-    // String Render
     if (state.elems.length) {
-      ctx.save();
-      if (flat) {
-        ctx.translate(4, 4);
-        this.drawString(ctx, state, true);
-        ctx.translate(-4, -4);
-      }
-      this.drawString(ctx, state, false);
-      ctx.restore();
+      ctx.save(); this.drawString(ctx, state); ctx.restore();
     }
 
     if (!flat) this.drawClasp(ctx, state.product, state.clasp, state.strColor);
 
-    // Beads Render
     if (state.elems.length) {
       const positions = this.getPositions(state);
       for (let i = 0; i < state.elems.length; i++) {
-        const el = state.elems[i];
+        const el  = state.elems[i];
         const pos = positions[i] || { x: W / 2, y: H / 2, angle: 0 };
-        const R = el.small ? 14 : (el.large ? 28 : 22);
-        const isSelected = interactive && state.selectedId === el.uid;
+        const R   = el.useImg ? 14 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22;
+        const sel = interactive && state.selectedId === el.uid;
 
         ctx.save();
         ctx.translate(pos.x, pos.y);
-        
-        if (el.category === 'beads' || el.isLetter) {
-          ctx.rotate(pos.angle * Math.PI / 180);
-        }
-        
-        // Pass pos.angle so we can counter-rotate the text letters
-        this.drawBrutalistElement(ctx, el, R, isSelected, false, pos.angle);
+        if (!el.useImg) ctx.rotate(pos.angle * Math.PI / 180);
+        this.drawElement(ctx, el, R, sel, false, pos.angle);
         ctx.restore();
       }
     }
 
-    // Keychain ring overlay
+    // Keychain ring — flat gold
     if (state.product === 'keychain' && !flat) {
-      ctx.save(); ctx.strokeStyle = '#111118'; ctx.lineWidth = 6;
-      ctx.translate(3, 3); ctx.beginPath(); ctx.arc(340, 130, 42, 0, Math.PI * 2); ctx.stroke();
-      ctx.translate(-3, -3); ctx.strokeStyle = '#E0E0E0'; ctx.stroke();
-      ctx.strokeStyle = '#111118'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.save();
+      ctx.strokeStyle = '#D4AF37'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(340, 130, 40, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
   }
 
-  drawString(ctx, state, isShadow) {
+  // ─── STRING — flat, no shadows ───────────────────────────────────────────────
+  drawString(ctx, state) {
     ctx.save();
-    ctx.lineJoin = 'round';
-    const drawPath = () => { this.drawProductPath(ctx, state); };
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const c = state.strColor;
+    const drawPath = () => this.drawProductPath(ctx, state);
 
-    if (state.strType === 'Elastic') {
-      ctx.lineCap = 'round';
-      if (isShadow) {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; drawPath(); ctx.stroke();
-      } else {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; drawPath(); ctx.stroke();
-        ctx.strokeStyle = state.strColor; ctx.lineWidth = 4; drawPath(); ctx.stroke();
-      }
-    } else if (state.strType === 'Cord') {
-      ctx.lineCap = 'butt';
-      if (isShadow) {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 8; drawPath(); ctx.stroke();
-      } else {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 8; drawPath(); ctx.stroke();
-        ctx.strokeStyle = state.strColor; ctx.lineWidth = 6; drawPath(); ctx.stroke();
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; ctx.setLineDash([4, 8]); drawPath(); ctx.stroke();
-      }
+    if (state.strType === 'Chain') {
+      ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
+      drawPath(); ctx.stroke();
+      ctx.setLineDash([]);
     } else if (state.strType === 'Wire') {
-      ctx.lineCap = 'round';
-      if (isShadow) {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 4; drawPath(); ctx.stroke();
-      } else {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 4; drawPath(); ctx.stroke();
-        ctx.strokeStyle = state.strColor; ctx.lineWidth = 2; drawPath(); ctx.stroke();
-      }
-    } else if (state.strType === 'Chain') {
-      ctx.lineCap = 'round';
-      if (isShadow) {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 12; ctx.setLineDash([0, 18]); drawPath(); ctx.stroke();
-        ctx.lineWidth = 6; ctx.setLineDash([]); drawPath(); ctx.stroke();
-      } else {
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 6; ctx.setLineDash([]); drawPath(); ctx.stroke();
-        ctx.strokeStyle = state.strColor; ctx.lineWidth = 2; drawPath(); ctx.stroke();
-        
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 12; ctx.setLineDash([0, 18]); drawPath(); ctx.stroke();
-        ctx.strokeStyle = state.strColor; ctx.lineWidth = 8; drawPath(); ctx.stroke();
-        
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 3; drawPath(); ctx.stroke();
-      }
+      ctx.strokeStyle = c; ctx.lineWidth = 2;
+      drawPath(); ctx.stroke();
+    } else if (state.strType === 'Cord') {
+      ctx.strokeStyle = this._darken(c, 0.08); ctx.lineWidth = 7; drawPath(); ctx.stroke();
+      ctx.strokeStyle = c; ctx.lineWidth = 5; drawPath(); ctx.stroke();
+    } else {
+      // Elastic — single clean stroke
+      ctx.strokeStyle = c; ctx.lineWidth = 4;
+      drawPath(); ctx.stroke();
     }
     ctx.restore();
   }
 
   drawProductPath(ctx, state) {
     if (state.view === 'flatlay') {
-      ctx.beginPath(); ctx.moveTo(80, 240); ctx.lineTo(600, 240);
-      return;
+      ctx.beginPath(); ctx.moveTo(80, 240); ctx.lineTo(600, 240); return;
     }
-
     if (state.product === 'bracelet') {
       const { cx, cy, rx, ry } = this.PATHS.bracelet;
       ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
@@ -229,214 +201,276 @@ export class CanvasEngine {
 
   drawClasp(ctx, product, clasp, color) {
     if (clasp === 'none') return;
-    ctx.save(); ctx.fillStyle = color; ctx.strokeStyle = '#111118'; ctx.lineWidth = 3;
+    ctx.save();
+    ctx.fillStyle = '#D4AF37';
     if (product === 'bracelet') {
       ctx.translate(150, 170); ctx.rotate(-0.3);
-      ctx.fillRect(-10, -10, 20, 20); ctx.strokeRect(-10, -10, 20, 20);
+      ctx.beginPath(); this.roundRect(ctx, -8, -8, 16, 16, 4); ctx.fill();
     } else if (product === 'necklace') {
-      [[60, 80], [620, 80]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
-    } else if (product === 'keychain') {
-      ctx.beginPath(); ctx.arc(340, 172, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
-  }
-
-  // --- BRUTALIST ELEMENT LOGIC ---
-  fillStroke(ctx, pathFunc, color, R, isFlat) {
-    ctx.fillStyle = color;
-    ctx.strokeStyle = '#111118';
-    ctx.lineWidth = 3;
-    ctx.lineJoin = 'round';
-    
-    ctx.save();
-    ctx.translate(isFlat ? 4 : 3, isFlat ? 4 : 3);
-    ctx.fillStyle = '#111118';
-    ctx.beginPath(); pathFunc(ctx, R); ctx.fill();
-    ctx.restore();
-
-    ctx.beginPath(); pathFunc(ctx, R); ctx.fill(); ctx.stroke();
-  }
-
-  drawBrutalistElement(ctx, el, R, isSelected, isThumb = false, posAngle = 0) {
-    const color = el.color || el.ltrBg || '#FFF';
-    const detail = el.detail || '#FFF';
-    
-    if (isSelected && !isThumb) {
-      ctx.shadowColor = '#FF5FA0';
-      ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-      ctx.shadowBlur = 0;
-      ctx.save();
-      ctx.strokeStyle = '#FF5FA0';
-      ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.arc(0, 0, R + 8, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
+      [[60,80],[620,80]].forEach(([x,y]) => { ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI*2); ctx.fill(); });
     } else {
-      ctx.shadowColor = 'transparent';
+      ctx.beginPath(); ctx.arc(340, 172, 8, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ─── OUTLINE FILL — fill + stroke at darker shade of same color ─────────────
+  // Mimics the charm aesthetic: no black outlines, just a tonal border.
+  outlineFill(ctx, pathFunc, color, R) {
+    // Fill
+    ctx.fillStyle = color;
+    ctx.beginPath(); pathFunc(ctx, R); ctx.fill();
+    // Stroke — darker version of the same color, proportional to size
+    ctx.strokeStyle = this._darken(color, 0.22);
+    ctx.lineWidth   = Math.max(1.5, R * 0.11);
+    ctx.lineJoin    = 'round';
+    ctx.beginPath(); pathFunc(ctx, R); ctx.stroke();
+  }
+
+  // ─── SELECTION — flat dashed ring, no glow ──────────────────────────────────
+  drawSelectionGlow(ctx, R) {
+    ctx.save();
+    ctx.strokeStyle = '#F7A8C8';
+    ctx.lineWidth   = 2.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.arc(0, 0, R + 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // ─── FIGURE (real image) ────────────────────────────────────────────────────
+  drawImageElement(ctx, el, R, isSelected) {
+    const source = this.scaledCache.get(el.imgSrc) || this.imageCache.get(el.imgSrc);
+    const D = 100;
+
+    if (!source) {
+      ctx.fillStyle = '#F7A8C8'; ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('✿', -10, 0);
+      return;
     }
 
-    const isFlat = !isThumb; 
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
+    const tf = ctx.getTransform();
+    ctx.rotate(-Math.atan2(tf.b, tf.a));
+
+    const yTop = -D * 0.10;
+
+    ctx.save();
+    if (isSelected) {
+      ctx.filter = 'drop-shadow(0px 0px 8px rgba(247,168,200,0.9))';
+      ctx.drawImage(source, -D/2, yTop, D, D);
+      ctx.filter = 'none';
+    }
+    // Clean image, no shadow — outline comes from the image's own dark pixels
+    ctx.drawImage(source, -D/2, yTop, D, D);
+    ctx.restore();
+  }
+
+  // ─── ELEMENT DISPATCHER ─────────────────────────────────────────────────────
+  drawElement(ctx, el, R, isSelected, isThumb = false, posAngle = 0) {
+    if (el.useImg) { this.drawImageElement(ctx, el, R, isSelected && !isThumb); return; }
+
+    if (isSelected && !isThumb) this.drawSelectionGlow(ctx, R);
+
+    const color  = el.color  || '#FFFFFF';
+    const detail = el.detail || '#FFFFFF';
+
+    // ── Letters — flat rounded rect or circle, no shadow, no highlight ───────
     if (el.isLetter) {
-      // Changed letters from squares to circles to match your reference image
-      this.fillStroke(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R, isFlat);
-      ctx.fillStyle = el.ltrText || '#111118';
-      ctx.font = `900 ${R * 1.2}px 'Nunito', sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      
-      // Counter-rotate the text so it never flips upside down on the bracelet
+      const bg = el.ltrBg   || '#FFFFFF';
+      const fg = el.ltrText || '#333344';
+
+      if (el.letterShape === 'square') {
+        const s = R * 1.85;
+        ctx.fillStyle = bg;
+        ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s * 0.22); ctx.fill();
+        ctx.strokeStyle = this._darken(bg, 0.20);
+        ctx.lineWidth = Math.max(1.5, R * 0.10);
+        ctx.lineJoin = 'round';
+        ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s * 0.22); ctx.stroke();
+      } else {
+        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), bg, R);
+      }
+
       ctx.save();
       ctx.rotate(-posAngle * Math.PI / 180);
-      ctx.fillText(el.label, 0, R * 0.1);
+      ctx.fillStyle = fg;
+      ctx.font = `900 ${R * 1.1}px 'Nunito', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(el.label, 0, R * 0.07);
       ctx.restore();
       return;
     }
 
-    switch(el.shape) {
+    // ── Shapes — FLAT, no outlines, no shadows, no highlights ────────────────
+    switch (el.shape) {
+
       case 'round':
-        this.fillStroke(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R, isFlat);
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.65, Math.PI, Math.PI * 1.5);
-        ctx.strokeStyle = detail; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
+        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R);
         break;
+
+      case 'ellipse':
+        this.outlineFill(ctx, (c, r) => c.ellipse(0, 0, r*1.55, r*0.78, 0, 0, Math.PI*2), color, R);
+        break;
+
+      case 'tube':
+        this.outlineFill(ctx, (c, r) => c.ellipse(0, 0, r*0.7, r*1.58, 0, 0, Math.PI*2), color, R);
+        break;
+
       case 'pearl':
-        this.fillStroke(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R, isFlat);
-        ctx.beginPath(); ctx.arc(-R * 0.3, -R * 0.3, R * 0.25, 0, Math.PI * 2);
-        ctx.fillStyle = detail; ctx.fill();
+        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R);
         break;
+
       case 'faceted':
-        this.fillStroke(ctx, (c, r) => {
-          for(let i = 0; i < 6; i++) c.lineTo(Math.cos(i * Math.PI / 3) * r, Math.sin(i * Math.PI / 3) * r);
+        this.outlineFill(ctx, (c, r) => {
+          c.beginPath();
+          for (let i = 0; i < 6; i++) c.lineTo(Math.cos(i*Math.PI/3)*r, Math.sin(i*Math.PI/3)*r);
           c.closePath();
-        }, color, R, isFlat);
-        ctx.beginPath();
-        for(let i = 0; i < 6; i++) {
-          ctx.moveTo(0, 0); ctx.lineTo(Math.cos(i * Math.PI / 3) * R, Math.sin(i * Math.PI / 3) * R);
-        }
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 2; ctx.stroke();
+        }, color, R);
         break;
+
       case 'heart':
-        this.fillStroke(ctx, (c, r) => {
-          c.moveTo(0, r * 0.3);
-          c.bezierCurveTo(r, -r * 1.2, r * 2.2, r * 0.4, 0, r);
-          c.bezierCurveTo(-r * 2.2, r * 0.4, -r, -r * 1.2, 0, r * 0.3);
-        }, color, R, isFlat);
+        this.outlineFill(ctx, (c, r) => {
+          c.moveTo(0, r*0.3);
+          c.bezierCurveTo( r, -r*1.2,  r*2.2, r*0.4, 0,  r);
+          c.bezierCurveTo(-r*2.2, r*0.4, -r, -r*1.2, 0, r*0.3);
+        }, color, R);
         break;
+
       case 'star':
-        this.fillStroke(ctx, (c, r) => {
-          for(let i = 0; i < 10; i++){
-            const rad = i % 2 === 0 ? r : r * 0.45;
-            c.lineTo(Math.cos(i * Math.PI / 5 - Math.PI / 2) * rad, Math.sin(i * Math.PI / 5 - Math.PI / 2) * rad);
+        this.outlineFill(ctx, (c, r) => {
+          c.beginPath();
+          for (let i = 0; i < 10; i++) {
+            const rad = i % 2 === 0 ? r : r * 0.44;
+            c.lineTo(Math.cos(i*Math.PI/5 - Math.PI/2)*rad, Math.sin(i*Math.PI/5 - Math.PI/2)*rad);
           }
           c.closePath();
-        }, color, R, isFlat);
+        }, color, R);
         break;
+
       case 'moon':
-        this.fillStroke(ctx, (c, r) => {
-          c.arc(0, 0, r, Math.PI * 0.15, Math.PI * 1.85, true);
-          c.quadraticCurveTo(-r * 0.4, 0, Math.cos(Math.PI * 0.15) * r, Math.sin(Math.PI * 0.15) * r);
-        }, color, R, isFlat);
+        this.outlineFill(ctx, (c, r) => {
+          c.arc(0, 0, r, Math.PI*0.15, Math.PI*1.85, true);
+          c.quadraticCurveTo(-r*0.4, 0, Math.cos(Math.PI*0.15)*r, Math.sin(Math.PI*0.15)*r);
+        }, color, R);
         break;
+
       case 'flower':
-        this.fillStroke(ctx, (c, r) => {
-          for(let i = 0; i < 5; i++) {
-            const a = i * Math.PI * 2 / 5;
-            c.moveTo(0, 0); c.arc(Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6, r * 0.4, 0, Math.PI * 2);
-          }
-        }, color, R, isFlat);
-        ctx.beginPath(); ctx.arc(0, 0, R * 0.35, 0, Math.PI * 2);
-        ctx.fillStyle = detail; ctx.fill(); ctx.stroke();
+        for (let i = 0; i < 5; i++) {
+          const a = i * Math.PI * 2 / 5;
+          ctx.save();
+          ctx.translate(Math.cos(a)*R*0.56, Math.sin(a)*R*0.56);
+          this.outlineFill(ctx, (c, r) => c.arc(0, 0, r*0.48, 0, Math.PI*2), color, R);
+          ctx.restore();
+        }
+        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r*0.34, 0, Math.PI*2), detail, R);
         break;
-      case 'rainbow':
-        this.fillStroke(ctx, (c, r) => {
-          c.arc(0, r * 0.3, r, Math.PI, 0); c.lineTo(r * 0.5, r * 0.3);
-          c.arc(0, r * 0.3, r * 0.5, 0, Math.PI, true); c.closePath();
-        }, color, R, isFlat);
-        ctx.beginPath(); ctx.arc(0, R * 0.3, R * 0.75, Math.PI, 0);
-        ctx.strokeStyle = detail; ctx.lineWidth = R * 0.25; ctx.stroke();
-        ctx.beginPath(); ctx.arc(0, R * 0.3, R * 0.75, Math.PI, 0);
-        ctx.strokeStyle = '#111118'; ctx.lineWidth = 3; ctx.stroke();
-        break;
-      case 'bunny':
-        this.fillStroke(ctx, (c, r) => {
-          c.ellipse(-r * 0.4, -r * 0.8, r * 0.25, r * 0.7, -0.2, 0, Math.PI * 2);
-          c.ellipse(r * 0.4, -r * 0.8, r * 0.25, r * 0.7, 0.2, 0, Math.PI * 2);
-        }, color, R, isFlat);
-        this.fillStroke(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R, isFlat);
-        ctx.fillStyle = '#111118';
-        ctx.beginPath(); ctx.arc(-R * 0.3, -R * 0.1, R * 0.1, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(R * 0.3, -R * 0.1, R * 0.1, 0, Math.PI * 2); ctx.fill();
-        break;
-      case 'bear':
-        this.fillStroke(ctx, (c, r) => {
-          c.arc(-r * 0.7, -r * 0.7, r * 0.4, 0, Math.PI * 2);
-          c.arc(r * 0.7, -r * 0.7, r * 0.4, 0, Math.PI * 2);
-        }, color, R, isFlat);
-        this.fillStroke(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R, isFlat);
-        ctx.fillStyle = '#111118';
-        ctx.fillRect(-R * 0.4, -R * 0.2, R * 0.15, R * 0.15); ctx.fillRect(R * 0.25, -R * 0.2, R * 0.15, R * 0.15);
-        break;
-      case 'cat':
-        this.fillStroke(ctx, (c, r) => {
-          c.moveTo(-r, -r); c.lineTo(-r * 0.2, -r * 0.6); c.lineTo(-r * 0.8, 0);
-          c.moveTo(r, -r); c.lineTo(r * 0.2, -r * 0.6); c.lineTo(r * 0.8, 0);
-        }, color, R, isFlat);
-        this.fillStroke(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R, isFlat);
-        ctx.fillStyle = '#111118';
-        ctx.fillRect(-R * 0.4, -R * 0.1, R * 0.15, R * 0.15); ctx.fillRect(R * 0.25, -R * 0.1, R * 0.15, R * 0.15);
-        break;
-      case 'mushroom':
-        this.fillStroke(ctx, (c, r) => { c.rect(-r * 0.3, 0, r * 0.6, r * 0.9); }, detail, R, isFlat);
-        this.fillStroke(ctx, (c, r) => { c.arc(0, r * 0.2, r, Math.PI, 0); c.closePath(); }, color, R, isFlat);
-        ctx.fillStyle = detail;
-        ctx.beginPath(); ctx.arc(-R * 0.5, -R * 0.3, R * 0.2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(R * 0.4, -R * 0.4, R * 0.15, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(0, -R * 0.6, R * 0.15, 0, Math.PI * 2); ctx.fill();
-        break;
-      case 'strawberry':
-        this.fillStroke(ctx, (c, r) => {
-          c.moveTo(0, r); c.quadraticCurveTo(r, r * 0.5, r * 0.8, -r * 0.5);
-          c.quadraticCurveTo(0, -r, -r * 0.8, -r * 0.5); c.quadraticCurveTo(-r, r * 0.5, 0, r);
-        }, color, R, isFlat);
-        this.fillStroke(ctx, (c, r) => {
-          c.moveTo(0, -r * 0.5); c.lineTo(-r * 0.6, -r * 0.9); c.lineTo(-r * 0.2, -r * 0.5);
-          c.lineTo(0, -r); c.lineTo(r * 0.2, -r * 0.5); c.lineTo(r * 0.6, -r * 0.9); c.closePath();
-        }, detail, R, false);
-        ctx.fillStyle = '#111118';
-        [[-0.4, -0.1], [0.4, 0], [0, 0.4], [-0.3, 0.5], [0.3, -0.3]].forEach(([dx, dy]) => {
-          ctx.fillRect(dx * R, dy * R, 3, 3);
+
+      case 'rainbow': {
+        const stripes = ['#FFB3C6','#FFCF8B','#FFF4A3','#B5EDCA','#B3D9FF','#D9C0F5'];
+        stripes.forEach((col, idx) => {
+          const oR = R * (1 - idx * 0.12);
+          const iR = oR - R * 0.10;
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.arc(0, R*0.15, oR, Math.PI, 0);
+          ctx.arc(0, R*0.15, iR, 0, Math.PI, true);
+          ctx.closePath(); ctx.fill();
         });
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(0, R*0.15, R*0.20, Math.PI, 0);
+        ctx.arc(0, R*0.35, R*0.32, 0, Math.PI);
+        ctx.closePath(); ctx.fill();
         break;
+      }
+
+      case 'bow': {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(0,0); ctx.bezierCurveTo(-R*1.4,-R*0.9,-R*1.6,R*0.4,-R*0.2,R*0.15); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(0,0); ctx.bezierCurveTo( R*1.4,-R*0.9, R*1.6,R*0.4, R*0.2,R*0.15); ctx.closePath(); ctx.fill();
+        this.outlineFill(ctx, (c,r) => c.arc(0, R*0.06, r*0.3, 0, Math.PI*2), detail, R);
+        break;
+      }
+
+      case 'butterfly': {
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.ellipse(-R*.7,-R*.32,R*.7,R*.52,-0.4,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse( R*.7,-R*.32,R*.7,R*.52, 0.4,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = this._lighten(color, 0.18);
+        ctx.beginPath(); ctx.ellipse(-R*.52, R*.3,R*.48,R*.36,0.3,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse( R*.52, R*.3,R*.48,R*.36,-0.3,0,Math.PI*2); ctx.fill();
+        this.outlineFill(ctx, (c,r) => c.ellipse(0, 0, r*0.17, r*0.78, 0, 0, Math.PI*2), detail, R);
+        break;
+      }
+
+      default:
+        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI*2), color, R);
     }
   }
 
-  generateThumbnails(elementsArray) {
+  // ─── UTILITIES ──────────────────────────────────────────────────────────────
+  roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+  }
+
+  _lighten(hex, a) { return this._adj(hex,  a); }
+  _darken (hex, a) { return this._adj(hex, -a); }
+  _adj(hex, a) {
+    try {
+      const n = parseInt(hex.replace('#',''), 16);
+      const c = v => Math.min(255, Math.max(0, v + Math.round(255*a)));
+      return `rgb(${c(n>>16)},${c((n>>8)&0xff)},${c(n&0xff)})`;
+    } catch { return hex; }
+  }
+
+  // ─── THUMBNAILS ─────────────────────────────────────────────────────────────
+  generateThumbnails(arr) {
     const c = document.createElement('canvas');
-    c.width = 100; c.height = 100;
+    c.width = c.height = 100;
     const ctx = c.getContext('2d');
-    
-    elementsArray.forEach(el => {
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    arr.forEach(el => {
+      if (el.useImg) return;
       ctx.clearRect(0, 0, 100, 100);
       ctx.save();
-      const R = el.small ? 20 : (el.large ? 38 : 30);
+      const R = el.small ? 20 : el.shape === 'ellipse' ? 28 : 28;
       ctx.translate(50, 50);
-      this.drawBrutalistElement(ctx, el, R, false, true, 0);
+      this.drawElement(ctx, el, R, false, true, 0);
       ctx.restore();
       el.imgUrl = c.toDataURL('image/png');
     });
   }
 
+  generateFigureThumb(el) {
+    const source = this.scaledCache.get(el.imgSrc) || this.imageCache.get(el.imgSrc);
+    const c = document.createElement('canvas');
+    c.width = c.height = 100;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    if (source) {
+      ctx.filter = 'drop-shadow(2px 4px 6px rgba(0,0,0,0.20))';
+      ctx.drawImage(source, 6, 6, 88, 88);
+      ctx.filter = 'none';
+    }
+    return c.toDataURL('image/png');
+  }
+
   createSingleThumb(el) {
     const c = document.createElement('canvas');
-    c.width = 100; c.height = 100;
+    c.width = c.height = 100;
     const ctx = c.getContext('2d');
-    const R = el.small ? 20 : (el.large ? 38 : 30);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     ctx.translate(50, 50);
-    this.drawBrutalistElement(ctx, el, R, false, true, 0);
+    this.drawElement(ctx, el, el.small ? 20 : 28, false, true, 0);
     return c.toDataURL('image/png');
   }
 }

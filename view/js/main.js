@@ -5,30 +5,37 @@ import { UIController } from './uicontroller.js';
 
 class App {
   constructor() {
-    // 1. Initialize isolated modules
     this.state = new State(this);
     this.canvasEngine = new CanvasEngine();
     this.ui = new UIController(this);
-    
-    // 2. Start the application
-    this.init();
+
+    // Kick off async init — preload figure images first, then build UI
+    this._init();
   }
 
-  init() {
-    // Generate base64 thumbnail images for the library dynamically
-    this.canvasEngine.generateThumbnails([...BEADS, ...CHARMS, ...FIGURES]);
-    
-    // Build the UI Library Grids using the data that now has thumbnails
-    this.ui.buildGrid('grid-beads', BEADS);
-    this.ui.buildGrid('grid-charms', CHARMS);
-    this.ui.buildGrid('grid-figures', FIGURES);
+  async _init() {
+    // 1. Preload all real figure images into the engine's cache
+    await this.canvasEngine.preloadImages(FIGURES);
+
+    // 2. Set imgUrl for figures from their imgSrc (used by library cards & inspector)
+    FIGURES.forEach(el => {
+      // Generate a proper canvas thumbnail now that the image is in cache
+      el.imgUrl = this.canvasEngine.generateFigureThumb(el);
+    });
+
+    // 3. Generate canvas thumbnails for beads & charms (drawn shapes, sync)
+    this.canvasEngine.generateThumbnails([...BEADS, ...CHARMS]);
+
+    // 4. Build library grids
+    this.ui.buildGrid('grid-beads',    BEADS);
+    this.ui.buildGrid('grid-charms',   CHARMS);
+    this.ui.buildGrid('grid-figures',  FIGURES, true); // true = is figures tab
     this.ui.buildLetters();
-    
-    // Perform initial draw
+
+    // 5. First render
     this.render();
   }
 
-  // The master render pipeline that syncs Canvas and UI based on State
   render() {
     const mainCanvas = document.getElementById('main-canvas');
     this.canvasEngine.draw(mainCanvas, this.state, true);
@@ -36,6 +43,4 @@ class App {
   }
 }
 
-// Expose the app to the window globally
-// This is required so inline HTML onclicks like `onclick="app.ui.openOrder()"` work.
 window.app = new App();

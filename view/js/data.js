@@ -27,14 +27,16 @@ export const CHARMS = [
   {id:'c10',name:'Rainbow',shape:'rainbow',color:'#FF5FA0',detail:'#1AC8C4',price:20,stock:'in',category:'charms'},
 ];
 
+// ─── FIGURES: real images from img/hello kitty/ ───────────────────────────
+// useImg:true  → CanvasEngine draws the image file instead of a drawn shape
+// imgSrc       → path relative to main.html
+// imgUrl       → set at runtime by preloadFigureImages() in main.js
 export const FIGURES = [
-  {id:'fg1',name:'Bunny Teal',shape:'bunny',color:'#1AC8C4',price:30,stock:'in',category:'figures',large:true},
-  {id:'fg2',name:'Bunny Pink',shape:'bunny',color:'#FF5FA0',price:30,stock:'in',category:'figures',large:true},
-  {id:'fg5',name:'Bear Honey',shape:'bear',color:'#F59E0B',price:30,stock:'in',category:'figures',large:true},
-  {id:'fg6',name:'Bear White',shape:'bear',color:'#FFFFFF',price:30,stock:'in',category:'figures',large:true},
-  {id:'fg8',name:'Cat Ink',shape:'cat',color:'#2A2A35',price:30,stock:'in',category:'figures',large:true},
-  {id:'s2',name:'Mushroom',shape:'mushroom',color:'#EF4444',detail:'#FFFFFF',price:28,stock:'in',category:'figures',large:true},
-  {id:'s4',name:'Strawberry',shape:'strawberry',color:'#F43F5E',detail:'#C8E833',price:28,stock:'in',category:'figures',large:true},
+  {id:'fg1', name:'Hello Kitty 1', useImg:true, imgSrc:'./img/hello kitty/01.png', price:35, stock:'in',  category:'figures', large:true},
+  {id:'fg2', name:'Hello Kitty 2', useImg:true, imgSrc:'./img/hello kitty/02.png', price:35, stock:'in',  category:'figures', large:true},
+  {id:'fg3', name:'Hello Kitty 3', useImg:true, imgSrc:'./img/hello kitty/03.png', price:35, stock:'in',  category:'figures', large:true},
+  {id:'fg4', name:'Hello Kitty 4', useImg:true, imgSrc:'./img/hello kitty/04.png', price:35, stock:'low', category:'figures', large:true},
+  {id:'fg5', name:'Hello Kitty 5', useImg:true, imgSrc:'./img/hello kitty/05.png', price:35, stock:'in',  category:'figures', large:true},
 ];
 
 export const ELEM_MAP = {};
