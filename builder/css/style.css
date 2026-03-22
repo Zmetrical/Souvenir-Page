@@ -624,7 +624,7 @@ body {
   color: var(--ink2);
 }
 .dir-btn:hover  { background: var(--grey-50); }
-.dir-btn.active { background: var(--teal-lt); color: var(--teal-dk); border-color: var(--teal-bd); }
+.dir-btn.active { background: var(--pink-lt); color: var(--pink-dk); border-color: var(--pink-bd); }
 
 /* ── Library Tabs ── */
 .ltabs {
