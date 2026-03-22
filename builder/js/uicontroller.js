@@ -364,17 +364,42 @@ export class UIController {
     });
   }
 
-  // Figures tab — flat 2-col grid of shaped decorative charms
+  // Figures tab — cube beads grouped by category
   buildFiguresGrid(items) {
     const container = document.getElementById('grid-figures');
     if (!container) return;
-    container.innerHTML = items.map(item => `
-      <div class="ecard${item.stock === 'out' ? ' out' : ''}"
-           onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
-           title="${item.name}">
-        <div class="eprev-img"><img src="${item.imgUrl}" alt="${item.name}"/></div>
-        <div class="ename">${item.name}</div>
-        <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
+
+    const groups = {};
+    items.forEach(item => {
+      const g = item.group || 'Other';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(item);
+    });
+
+    container.style.cssText = 'overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;padding:7px 8px;display:flex;flex-direction:column;gap:5px;';
+    container.innerHTML = Object.entries(groups).map(([groupName, items], idx) => `
+      <div class="bgroup${idx === 0 ? ' open' : ''}">
+        <div class="bgroup-head" onclick="this.closest('.bgroup').classList.toggle('open')">
+          <div class="bgroup-head-l">
+            <img class="bgroup-preview" src="${items[0].imgUrl}" alt="${groupName}"/>
+            <span class="bgroup-lbl">${groupName}</span>
+          </div>
+          <div class="bgroup-head-r">
+            <span class="bgroup-price">₱${items[0].price}</span>
+            <svg class="bgroup-arr" viewBox="0 0 10 10"><polyline points="2,3 5,7 8,3"/></svg>
+          </div>
+        </div>
+        <div class="bgroup-body">
+          <div class="bgroup-swatches">
+            ${items.map(item => `
+              <div class="bswatch${item.stock === 'out' ? ' out' : ''}"
+                   onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
+                   title="${item.name}">
+                <img src="${item.imgUrl}" alt="${item.name}"/>
+                ${item.stock === 'low' ? '<span class="bswatch-low">!</span>' : ''}
+              </div>`).join('')}
+          </div>
+        </div>
       </div>`).join('');
   }
 

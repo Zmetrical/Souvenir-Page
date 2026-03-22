@@ -409,6 +409,16 @@ export class CanvasEngine {
     const color  = el.color  || '#FFFFFF';
     const detail = el.detail || '#FFFFFF';
 
+    // ── Cube family ───────────────────────────────────────────────────────────
+    if (el.shape && el.shape.startsWith('cube')) {
+      // Un-rotate so cube face is always upright
+      ctx.save();
+      ctx.rotate(-posAngle * Math.PI / 180);
+      this.drawCubeShape(ctx, el, R);
+      ctx.restore();
+      return;
+    }
+
     if (el.isLetter) {
       const bg = el.ltrBg   || '#FFFFFF';
       const fg = el.ltrText || '#333344';
@@ -539,6 +549,147 @@ export class CanvasEngine {
     }
   }
 
+  // ─── CUBE HELPER ────────────────────────────────────────────────────────────
+  _drawCubeBase(ctx, R, color) {
+    const s = R * 1.8;
+    ctx.fillStyle = color;
+    ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s * 0.18); ctx.fill();
+  }
+
+  _drawCubeDot(ctx, x, y, r, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  drawCubeShape(ctx, el, R) {
+    const color  = el.color  || '#F9B8CF';
+    const detail = el.detail || '#FFFFFF';
+    const s      = R * 1.8;
+    const h      = s / 2;
+    const dr     = R * 0.18; // dot radius
+
+    switch (el.shape) {
+
+      // ── Plain cube ─────────────────────────────────────────────────────────
+      case 'cube':
+        this._drawCubeBase(ctx, R, color);
+        break;
+
+      // ── Dice — classic pip layout ──────────────────────────────────────────
+      case 'cube-dice1':
+        this._drawCubeBase(ctx, R, color);
+        this._drawCubeDot(ctx, 0, 0, dr, detail);
+        break;
+
+      case 'cube-dice2':
+        this._drawCubeBase(ctx, R, color);
+        this._drawCubeDot(ctx, -h*0.42,  h*0.42, dr, detail);
+        this._drawCubeDot(ctx,  h*0.42, -h*0.42, dr, detail);
+        break;
+
+      case 'cube-dice3':
+        this._drawCubeBase(ctx, R, color);
+        this._drawCubeDot(ctx, -h*0.42,  h*0.42, dr, detail);
+        this._drawCubeDot(ctx,  0,        0,      dr, detail);
+        this._drawCubeDot(ctx,  h*0.42, -h*0.42, dr, detail);
+        break;
+
+      case 'cube-dice4':
+        this._drawCubeBase(ctx, R, color);
+        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy]) =>
+          this._drawCubeDot(ctx, dx*h*0.38, dy*h*0.38, dr, detail));
+        break;
+
+      case 'cube-dice5':
+        this._drawCubeBase(ctx, R, color);
+        [[-1,-1],[1,-1],[-1,1],[1,1],[0,0]].forEach(([dx,dy]) =>
+          this._drawCubeDot(ctx, dx*h*0.38, dy*h*0.38, dr, detail));
+        break;
+
+      case 'cube-dice6':
+        this._drawCubeBase(ctx, R, color);
+        [[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]].forEach(([dx,dy]) =>
+          this._drawCubeDot(ctx, dx*h*0.38, dy*h*0.38, dr, detail));
+        break;
+
+      // ── Heart print cube ───────────────────────────────────────────────────
+      case 'cube-heart': {
+        this._drawCubeBase(ctx, R, color);
+        const hr = R * 0.55;
+        ctx.fillStyle = detail;
+        ctx.beginPath();
+        ctx.moveTo(0, hr*0.3);
+        ctx.bezierCurveTo( hr, -hr*1.2,  hr*2.2, hr*0.4, 0,  hr);
+        ctx.bezierCurveTo(-hr*2.2, hr*0.4, -hr, -hr*1.2, 0, hr*0.3);
+        ctx.fill();
+        break;
+      }
+
+      // ── Star print cube ────────────────────────────────────────────────────
+      case 'cube-star': {
+        this._drawCubeBase(ctx, R, color);
+        const sr = R * 0.6;
+        ctx.fillStyle = detail;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const rad = i % 2 === 0 ? sr : sr * 0.44;
+          ctx.lineTo(Math.cos(i*Math.PI/5 - Math.PI/2)*rad, Math.sin(i*Math.PI/5 - Math.PI/2)*rad);
+        }
+        ctx.closePath(); ctx.fill();
+        break;
+      }
+
+      // ── Checkered cube ─────────────────────────────────────────────────────
+      case 'cube-checker': {
+        this._drawCubeBase(ctx, R, color);
+        const cs = s / 4;
+        ctx.fillStyle = detail;
+        // clip to cube shape
+        ctx.save();
+        ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s*0.18); ctx.clip();
+        for (let row = 0; row < 4; row++) {
+          for (let col = 0; col < 4; col++) {
+            if ((row + col) % 2 === 0) {
+              ctx.fillRect(-s/2 + col*cs, -s/2 + row*cs, cs, cs);
+            }
+          }
+        }
+        ctx.restore();
+        break;
+      }
+
+      // ── Polka dot cube ─────────────────────────────────────────────────────
+      case 'cube-dots': {
+        this._drawCubeBase(ctx, R, color);
+        const positions = [
+          [-0.38,-0.38],[0.38,-0.38],[0,-0.06],
+          [-0.38, 0.38],[0.38, 0.38],
+        ];
+        positions.forEach(([dx,dy]) =>
+          this._drawCubeDot(ctx, dx*s, dy*s, R*0.14, detail));
+        break;
+      }
+
+      // ── Smiley cube ────────────────────────────────────────────────────────
+      case 'cube-smile': {
+        this._drawCubeBase(ctx, R, color);
+        ctx.strokeStyle = detail; ctx.lineWidth = R * 0.14; ctx.lineCap = 'round';
+        // Eyes
+        ctx.fillStyle = detail;
+        this._drawCubeDot(ctx, -R*0.35, -R*0.2, R*0.13, detail);
+        this._drawCubeDot(ctx,  R*0.35, -R*0.2, R*0.13, detail);
+        // Smile
+        ctx.beginPath();
+        ctx.arc(0, R*0.1, R*0.38, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+        break;
+      }
+
+      default:
+        this._drawCubeBase(ctx, R, color);
+    }
+  }
+
   roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
@@ -566,7 +717,7 @@ export class CanvasEngine {
       if (el.useImg) return;
       ctx.clearRect(0, 0, 100, 100);
       ctx.save();
-      const R = el.small ? 20 : el.shape === 'ellipse' ? 28 : 28;
+      const R = el.small ? 20 : (el.shape && el.shape.startsWith('cube')) ? 26 : el.shape === 'ellipse' ? 28 : 28;
       ctx.translate(50, 50);
       this.drawElement(ctx, el, R, false, true, 0);
       ctx.restore();
