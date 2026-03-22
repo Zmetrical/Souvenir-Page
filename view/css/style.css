@@ -683,6 +683,169 @@ body {
 .toast.show { transform: translateX(-50%) translateY(0); }
 
 /* ══════════════════════════════════════════
+   GROUPED BEAD PANEL — collapsible accordion
+══════════════════════════════════════════ */
+.bead-groups {
+  overflow-y: auto;
+  flex: 1;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--off);
+}
+
+.bgroup {
+  background: var(--white);
+  border: var(--b2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Header row — always visible, click to toggle */
+.bgroup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--white);
+  transition: background .12s;
+}
+.bgroup-head:hover { background: var(--teal-bg); }
+.bgroup.open .bgroup-head { background: var(--teal-bg); border-bottom: 1px solid var(--inklt); }
+
+.bgroup-head-l { display: flex; align-items: center; gap: 8px; }
+.bgroup-head-r { display: flex; align-items: center; gap: 6px; }
+
+.bgroup-preview {
+  width: 26px; height: 26px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.bgroup-lbl {
+  font-family: var(--fh);
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.bgroup-price {
+  font-family: var(--fh);
+  font-size: .6rem;
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+.bgroup-arr {
+  width: 12px; height: 12px;
+  fill: none; stroke: var(--ink2);
+  stroke-width: 2; stroke-linecap: round;
+  transition: transform .18s;
+  flex-shrink: 0;
+}
+.bgroup.open .bgroup-arr { transform: rotate(180deg); }
+
+/* Body — hidden by default, shown when .open */
+.bgroup-body {
+  display: none;
+  padding: 8px 10px;
+}
+.bgroup.open .bgroup-body { display: block; }
+
+.bgroup-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Individual color swatch */
+.bswatch {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  position: relative;
+  transition: transform .1s;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.bswatch img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.bswatch:hover  { transform: scale(1.2) translateY(-2px); }
+.bswatch:active { transform: scale(0.93); }
+.bswatch.out    { opacity: .35; cursor: not-allowed; pointer-events: none; }
+
+.bswatch-low {
+  position: absolute; top: -2px; right: -2px;
+  width: 12px; height: 12px;
+  background: #FFE07A;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  font-size: .5rem; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink); pointer-events: none;
+}
+
+/* ══════════════════════════════════════════
+   LETTER SHAPE TOGGLE (Square / Circle)
+══════════════════════════════════════════ */
+.lshape-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: var(--b3);
+  background: var(--off);
+  flex-shrink: 0;
+}
+.lshape-btns {
+  display: flex;
+  flex: 1;
+  gap: 5px;
+}
+.lshape-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 6px;
+  font-size: .64rem;
+  font-weight: 800;
+  font-family: var(--fb);
+  border: var(--b2);
+  border-radius: 7px;
+  background: var(--white);
+  cursor: pointer;
+  transition: all .1s;
+  color: var(--ink);
+  box-shadow: var(--sh1);
+}
+.lshape-btn:hover  { transform: translate(-1px,-1px); box-shadow: 2px 2px 0 var(--ink); }
+.lshape-btn.active { background: var(--pink); box-shadow: inset 2px 2px 0 rgba(17,17,24,.08); transform: none; }
+
+/* Mini tile preview inside the button */
+.lshape-preview {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--white);
+  border: 1.5px solid var(--ink);
+  font-size: .72rem;
+  font-weight: 900;
+  font-family: var(--fh);
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.lshape-sq { border-radius: 4px; }
+.lshape-rd { border-radius: 50%; }
+
+/* ══════════════════════════════════════════
    SCROLLBARS
 ══════════════════════════════════════════ */
 ::-webkit-scrollbar       { width: 5px; height: 5px; }

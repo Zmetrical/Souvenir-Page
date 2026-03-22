@@ -178,10 +178,12 @@
       <div class="ltab" data-tab="letters" onclick="app.ui.switchTab(this)">A–Z</div>
     </div>
     
-    <div id="tab-beads" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
-      <div class="lsrch"><input type="text" placeholder="Search beads..." oninput="app.ui.filterLib(this)"/></div>
-      <div class="lgrid" id="grid-beads"></div>
-    </div>
+<div id="tab-beads" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
+  <div class="bead-groups" id="bead-groups"></div>
+</div>
+ 
+
+
     <div id="tab-charms" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div class="lsrch"><input type="text" placeholder="Search charms..." oninput="app.ui.filterLib(this)"/></div>
       <div class="lgrid" id="grid-charms"></div>
@@ -189,21 +191,41 @@
     <div id="tab-figures" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
       <div class="lgrid" id="grid-figures"></div>
     </div>
-    <div id="tab-letters" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
-      <div class="lclr">
-        <div class="slbl" style="margin:0;font-size:.65rem;white-space:nowrap;">Color</div>
-        <div class="swatches" id="ltr-sw">
-          <div class="sw active" style="background:#fff;" onclick="app.ui.setLtrCol('#ffffff','#111118',this)"></div>
-          <div class="sw" style="background:#111118;" onclick="app.ui.setLtrCol('#111118','#ffffff',this)"></div>
-          <div class="sw" style="background:#FF5FA0;" onclick="app.ui.setLtrCol('#FF5FA0','#111118',this)"></div>
-          <div class="sw" style="background:#1AC8C4;" onclick="app.ui.setLtrCol('#1AC8C4','#111118',this)"></div>
-          <div class="sw" style="background:#C8E833;" onclick="app.ui.setLtrCol('#C8E833','#111118',this)"></div>
-          <div class="sw" style="background:#A855F7;" onclick="app.ui.setLtrCol('#A855F7','#ffffff',this)"></div>
-          <div class="sw" style="background:#FFD700;" onclick="app.ui.setLtrCol('#FFD700','#111118',this)"></div>
-        </div>
-      </div>
-      <div class="lgrid-ltrs" id="grid-ltrs"></div>
+
+
+<div id="tab-letters" style="display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0;">
+ 
+  <!-- Row 1: Tile shape toggle (Square / Circle) -->
+  <div class="lshape-row">
+    <span class="dir-lbl">Tile Shape:</span>
+    <div class="lshape-btns">
+      <button class="lshape-btn active" onclick="app.ui.setLetterShape('square', this)">
+        <span class="lshape-preview lshape-sq">A</span> Square
+      </button>
+      <button class="lshape-btn" onclick="app.ui.setLetterShape('round', this)">
+        <span class="lshape-preview lshape-rd">A</span> Circle
+      </button>
     </div>
+  </div>
+ 
+  <!-- Row 2: Color swatches -->
+  <div class="lclr">
+    <div class="slbl" style="margin:0;font-size:.65rem;white-space:nowrap;">Color</div>
+    <div class="swatches" id="ltr-sw">
+      <div class="sw active" style="background:#fff;"     onclick="app.ui.setLtrCol('#ffffff','#333344',this)"></div>
+      <div class="sw"        style="background:#F9B8CF;"  onclick="app.ui.setLtrCol('#F9B8CF','#C06080',this)"></div>
+      <div class="sw"        style="background:#90DDD9;"  onclick="app.ui.setLtrCol('#90DDD9','#3A8884',this)"></div>
+      <div class="sw"        style="background:#C9A9F0;"  onclick="app.ui.setLtrCol('#C9A9F0','#6040A0',this)"></div>
+      <div class="sw"        style="background:#CCE86A;"  onclick="app.ui.setLtrCol('#CCE86A','#6A9020',this)"></div>
+      <div class="sw"        style="background:#FFE07A;"  onclick="app.ui.setLtrCol('#FFE07A','#A07010',this)"></div>
+      <div class="sw"        style="background:#3D3D52;"  onclick="app.ui.setLtrCol('#3D3D52','#ffffff',this)"></div>
+    </div>
+  </div>
+ 
+  <!-- Row 3: Letter grid -->
+  <div class="lgrid-ltrs" id="grid-ltrs"></div>
+ 
+</div>
   </div>
 </div>
 

@@ -27,7 +27,7 @@ class App {
     this.canvasEngine.generateThumbnails([...BEADS, ...CHARMS]);
 
     // 4. Build library grids
-    this.ui.buildGrid('grid-beads',    BEADS);
+    this.ui.buildBeadsPanel(BEADS);
     this.ui.buildGrid('grid-charms',   CHARMS);
     this.ui.buildGrid('grid-figures',  FIGURES, true); // true = is figures tab
     this.ui.buildLetters();
@@ -38,6 +38,21 @@ class App {
 
   render() {
     const mainCanvas = document.getElementById('main-canvas');
+
+    // ── DPR scaling: make canvas pixel-perfect on retina/HiDPI screens ──
+    // The canvas logical size stays 680×480 (CSS), but its internal pixel
+    // buffer is scaled up by devicePixelRatio so characters look crisp.
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const W = 680, H = 480;
+    if (mainCanvas.width !== W * dpr || mainCanvas.height !== H * dpr) {
+      mainCanvas.width  = W * dpr;
+      mainCanvas.height = H * dpr;
+      mainCanvas.style.width  = W + 'px';
+      mainCanvas.style.height = H + 'px';
+      const ctx = mainCanvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+    }
+
     this.canvasEngine.draw(mainCanvas, this.state, true);
     this.ui.updateAll();
   }

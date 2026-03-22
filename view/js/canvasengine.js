@@ -43,8 +43,9 @@ export class CanvasEngine {
     const count = elems.length;
     if (!count) return [];
 
+    // No gap padding — flat fills sit flush against each other like the reference
     const radii = elems.map(el =>
-      (el.useImg ? 14 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22) + 1
+      el.useImg ? 8 : el.shape === 'ellipse' ? 34 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22
     );
 
     if (state.view === 'flatlay') {
@@ -61,10 +62,11 @@ export class CanvasEngine {
       const { cx, cy, rx, ry } = this.PATHS.bracelet;
       const angles     = radii.map(r => (r * 2) / rx);
       const totalAngle = angles.reduce((s, a) => s + a, 0);
-      let t = Math.PI / 2 - totalAngle / 2 + angles[0] / 2;
+      // Start from LEFT side of bottom-center, move right → index 0 = left, last = right
+      let t = Math.PI / 2 + totalAngle / 2 - angles[0] / 2;
       return elems.map((el, i) => {
         const pos = { x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t), angle: t * 180 / Math.PI + 90 };
-        if (i < count - 1) t += angles[i] / 2 + angles[i + 1] / 2;
+        if (i < count - 1) t -= angles[i] / 2 + angles[i + 1] / 2;
         return pos;
       });
     }
@@ -72,11 +74,12 @@ export class CanvasEngine {
     if (state.product === 'necklace') {
       const approxLen  = 800;
       const totalWidth = radii.reduce((s, r) => s + r * 2, 0);
-      let t = 0.5 - totalWidth / approxLen / 2;
+      // Start from RIGHT of center, move left → index 0 = left, last = right
+      let t = 0.5 + totalWidth / approxLen / 2;
       return elems.map((el, i) => {
         const { x, y, dx, dy } = this.bezierPoint(60, 80, 60, 420, 620, 420, 620, 80, t);
         const pos = { x, y, angle: Math.atan2(dy, dx) * 180 / Math.PI };
-        if (i < count - 1) t += (radii[i] + radii[i + 1]) / approxLen;
+        if (i < count - 1) t -= (radii[i] + radii[i + 1]) / approxLen;
         return pos;
       });
     }
@@ -140,7 +143,7 @@ export class CanvasEngine {
       for (let i = 0; i < state.elems.length; i++) {
         const el  = state.elems[i];
         const pos = positions[i] || { x: W / 2, y: H / 2, angle: 0 };
-        const R   = el.useImg ? 14 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22;
+        const R   = el.useImg ? 8 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22;
         const sel = interactive && state.selectedId === el.uid;
 
         ctx.save();
@@ -160,7 +163,7 @@ export class CanvasEngine {
     }
   }
 
-  // ─── STRING — flat, no shadows ───────────────────────────────────────────────
+  // ─── STRING — flat single stroke ────────────────────────────────────────────
   drawString(ctx, state) {
     ctx.save();
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -169,18 +172,12 @@ export class CanvasEngine {
 
     if (state.strType === 'Chain') {
       ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
-      drawPath(); ctx.stroke();
-      ctx.setLineDash([]);
+      drawPath(); ctx.stroke(); ctx.setLineDash([]);
     } else if (state.strType === 'Wire') {
-      ctx.strokeStyle = c; ctx.lineWidth = 2;
-      drawPath(); ctx.stroke();
-    } else if (state.strType === 'Cord') {
-      ctx.strokeStyle = this._darken(c, 0.08); ctx.lineWidth = 7; drawPath(); ctx.stroke();
-      ctx.strokeStyle = c; ctx.lineWidth = 5; drawPath(); ctx.stroke();
+      ctx.strokeStyle = c; ctx.lineWidth = 2; drawPath(); ctx.stroke();
     } else {
-      // Elastic — single clean stroke
-      ctx.strokeStyle = c; ctx.lineWidth = 4;
-      drawPath(); ctx.stroke();
+      // Elastic + Cord — same flat stroke
+      ctx.strokeStyle = c; ctx.lineWidth = 5; drawPath(); ctx.stroke();
     }
     ctx.restore();
   }
@@ -214,27 +211,18 @@ export class CanvasEngine {
     ctx.restore();
   }
 
-  // ─── OUTLINE FILL — fill + stroke at darker shade of same color ─────────────
-  // Mimics the charm aesthetic: no black outlines, just a tonal border.
+  // ─── FLAT FILL — pure solid color, nothing else ──────────────────────────
   outlineFill(ctx, pathFunc, color, R) {
-    // Fill
     ctx.fillStyle = color;
     ctx.beginPath(); pathFunc(ctx, R); ctx.fill();
-    // Stroke — darker version of the same color, proportional to size
-    ctx.strokeStyle = this._darken(color, 0.22);
-    ctx.lineWidth   = Math.max(1.5, R * 0.11);
-    ctx.lineJoin    = 'round';
-    ctx.beginPath(); pathFunc(ctx, R); ctx.stroke();
   }
 
-  // ─── SELECTION — flat dashed ring, no glow ──────────────────────────────────
+  // ─── SELECTION — thin flat pink ring only ───────────────────────────────────
   drawSelectionGlow(ctx, R) {
     ctx.save();
     ctx.strokeStyle = '#F7A8C8';
-    ctx.lineWidth   = 2.5;
-    ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.arc(0, 0, R + 6, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.lineWidth   = 3;
+    ctx.beginPath(); ctx.arc(0, 0, R + 5, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
 
@@ -255,16 +243,28 @@ export class CanvasEngine {
     const tf = ctx.getTransform();
     ctx.rotate(-Math.atan2(tf.b, tf.a));
 
-    const yTop = -D * 0.10;
+    const ringR  = 8;
+    const figTop = ringR; // figure top flush with ring bottom — no gap
 
     ctx.save();
+
+    // ── Dashed selection ring — same style as regular bead selection ────────
     if (isSelected) {
-      ctx.filter = 'drop-shadow(0px 0px 8px rgba(247,168,200,0.9))';
-      ctx.drawImage(source, -D/2, yTop, D, D);
-      ctx.filter = 'none';
+      ctx.strokeStyle = '#F7A8C8';
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([3, 2]);
+      ctx.beginPath(); ctx.arc(0, 0, ringR + 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
     }
-    // Clean image, no shadow — outline comes from the image's own dark pixels
-    ctx.drawImage(source, -D/2, yTop, D, D);
+
+    // ── Jump ring — always pink ─────────────────────────────────────────────
+    ctx.strokeStyle = '#F7A8C8';
+    ctx.lineWidth   = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, ringR, 0, Math.PI * 2); ctx.stroke();
+
+    // ── Figure hangs directly below the ring ───────────────────────────────
+    ctx.drawImage(source, -D/2, figTop, D, D);
+
     ctx.restore();
   }
 
@@ -286,10 +286,6 @@ export class CanvasEngine {
         const s = R * 1.85;
         ctx.fillStyle = bg;
         ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s * 0.22); ctx.fill();
-        ctx.strokeStyle = this._darken(bg, 0.20);
-        ctx.lineWidth = Math.max(1.5, R * 0.10);
-        ctx.lineJoin = 'round';
-        ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s * 0.22); ctx.stroke();
       } else {
         this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), bg, R);
       }

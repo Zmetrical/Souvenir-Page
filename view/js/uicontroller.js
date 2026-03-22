@@ -28,8 +28,9 @@ export class UIController {
 
   handleDragStart(e, canvas) {
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+    // Use CSS pixel space (rect.width = 680) — NOT canvas.width (which is DPR-scaled)
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
     const state = this.app.state;
     if (!state.elems.length) return;
@@ -39,9 +40,15 @@ export class UIController {
 
     for (let i = state.elems.length - 1; i >= 0; i--) {
       const pos = positions[i];
-      // For useImg figures, hit area covers the full hanging body (D/2 = 50px)
-      const R = state.elems[i].useImg ? 50 : (state.elems[i].small ? 14 : state.elems[i].large ? 28 : 22) + 6;
-      if ((mx - pos.x) ** 2 + (my - pos.y) ** 2 <= R ** 2) { hit = state.elems[i].uid; break; }
+      const el  = state.elems[i];
+      let hx, hy, R;
+      if (el.useImg) {
+        // Only the jump ring (at string point y=0) is selectable — not the body
+        hx = pos.x; hy = pos.y; R = 14; // ring r=8 + 6px click margin
+      } else {
+        hx = pos.x; hy = pos.y; R = (el.small ? 14 : el.large ? 28 : 22) + 6;
+      }
+      if ((mx - hx) ** 2 + (my - hy) ** 2 <= R ** 2) { hit = el.uid; break; }
     }
 
     if (hit) {
@@ -63,8 +70,8 @@ export class UIController {
   handleDragMove(e, canvas) {
     if (!this.isDragging || !this.draggedUid) return;
     const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
 
     const state = this.app.state;
     const positions = this.app.canvasEngine.getPositions(state);
@@ -255,6 +262,43 @@ export class UIController {
         <div class="ename">${item.name}</div>
         <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
       </div>`).join('');
+  }
+
+  // ─── GROUPED BEAD PANEL (collapsible accordion) ──────────────────────────────
+  buildBeadsPanel(items) {
+    const groups = {};
+    items.forEach(item => {
+      const g = item.group || 'Other';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(item);
+    });
+
+    const html = Object.entries(groups).map(([groupName, beads], idx) => `
+      <div class="bgroup${idx === 0 ? ' open' : ''}" id="bgroup-${groupName.toLowerCase()}">
+        <div class="bgroup-head" onclick="this.closest('.bgroup').classList.toggle('open')">
+          <div class="bgroup-head-l">
+            <img class="bgroup-preview" src="${beads[0].imgUrl}" alt="${groupName}"/>
+            <span class="bgroup-lbl">${groupName}</span>
+          </div>
+          <div class="bgroup-head-r">
+            <span class="bgroup-price">₱${beads[0].price}</span>
+            <svg class="bgroup-arr" viewBox="0 0 10 10"><polyline points="2,3 5,7 8,3"/></svg>
+          </div>
+        </div>
+        <div class="bgroup-body">
+          <div class="bgroup-swatches">
+            ${beads.map(item => `
+              <div class="bswatch${item.stock === 'out' ? ' out' : ''}"
+                   onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
+                   title="${item.name}">
+                <img src="${item.imgUrl}" alt="${item.name}"/>
+                ${item.stock === 'low' ? '<span class="bswatch-low">!</span>' : ''}
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>`).join('');
+
+    document.getElementById('bead-groups').innerHTML = html;
   }
 
   buildLetters() {
