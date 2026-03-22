@@ -1,6 +1,6 @@
-import { BEADS, FIGURES, CHARMS } from './data.js';
+import { BEADS, FIGURES, CHARMS } from './data/index.js';
 import { State } from './state.js';
-import { CanvasEngine } from './canvasengine.js';
+import { CanvasEngine } from './canvas/canvasengine.js';
 import { UIController } from './uicontroller.js';
 
 class App {

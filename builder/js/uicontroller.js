@@ -1,4 +1,4 @@
-import { BEADS, FIGURES, CHARMS, ELEM_MAP } from './data.js';
+import { BEADS, FIGURES, CHARMS, ELEM_MAP } from './data/index.js';
 
 export class UIController {
   constructor(appInstance) {
@@ -138,8 +138,6 @@ export class UIController {
     if (emptyOver) emptyOver.style.display = state.elems.length ? 'none' : 'flex';
   }
 
-  // Renders the "Adding to strand" selector inside the design panel
-  // Only visible when product is keychain and strands > 1
   updateHistoryButtons() {
     const state = this.app.state;
     document.getElementById('btn-undo').disabled = !state.history.length;
@@ -163,11 +161,10 @@ export class UIController {
 
     const newEl = { uid: state.generateId(), ...item };
     if (state.product === 'keychain') {
-      newEl.strand = state.activeStrand; // always use activeStrand — never inherit from selection
+      newEl.strand = state.activeStrand;
     }
 
     const selectedIdx = state.elems.findIndex(e => e.uid === state.selectedId);
-    // Only insert after selected if it's on the same strand
     const selEl = state.elems[selectedIdx];
     if (selectedIdx !== -1 && state.product === 'keychain' && (selEl?.strand ?? 0) === newEl.strand) {
       state.elems.splice(selectedIdx + 1, 0, newEl);
@@ -364,43 +361,120 @@ export class UIController {
     });
   }
 
-  // Figures tab — cube beads grouped by category
+  // Figures tab — compact: scrollable type pills + color swatches for active type
+  // ── Figure sections state ────────────────────────────────────────────────
+  // Each section key: { open: bool, activeGroup: string }
+  // Sections are defined here — add more objects to grow the Figures tab.
+  // ── Figures tab ─────────────────────────────────────────────────────────
+  // Sections are defined in _getFigureSections().
+  // Each section reuses the existing .bgroup accordion classes from the Beads/Charms tabs.
+  // To add a new section (e.g. Pendants): push one object into the array below.
+
+  _getFigureSections(items) {
+    if (this._figureSections) return this._figureSections;
+
+    const cubeItems = items.filter(i => i.category === 'figures');
+    const cubeGroups = {};
+    cubeItems.forEach(item => {
+      const g = item.group || 'Other';
+      if (!cubeGroups[g]) cubeGroups[g] = [];
+      cubeGroups[g].push(item);
+    });
+
+    this._figureSections = [
+      {
+        key:         'cubes',
+        label:       'Cube',
+        open:        true,
+        groups:      cubeGroups,
+        activeGroup: Object.keys(cubeGroups)[0] || '',
+      },
+      // Add future sections here, e.g.:
+      // { key: 'pendants', label: 'Pendant', open: false, groups: {}, activeGroup: '' },
+    ];
+    return this._figureSections;
+  }
+
   buildFiguresGrid(items) {
     const container = document.getElementById('grid-figures');
     if (!container) return;
 
-    const groups = {};
-    items.forEach(item => {
-      const g = item.group || 'Other';
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(item);
+    container.style.cssText = 'overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;padding:7px 8px;display:flex;flex-direction:column;gap:5px;';
+
+    const sections = this._getFigureSections(items);
+
+    container.innerHTML = sections.map((sec, idx) => {
+      const groupNames  = Object.keys(sec.groups);
+      const firstItem   = (sec.groups[groupNames[0]] || [])[0];
+      const swatchesHtml = this._buildFigureSwatches(sec);
+
+      return `
+        <div class="bgroup${sec.open ? ' open' : ''}" data-fig-key="${sec.key}">
+          <div class="bgroup-head" onclick="app.ui.toggleFigureSection('${sec.key}')">
+            <div class="bgroup-head-l">
+              ${firstItem ? `<img class="bgroup-preview" src="${firstItem.imgUrl}" alt="${sec.label}"/>` : ''}
+              <span class="bgroup-lbl">${sec.label}</span>
+            </div>
+            <div class="bgroup-head-r">
+              <svg class="bgroup-arr" viewBox="0 0 10 10"><polyline points="2,3 5,7 8,3"/></svg>
+            </div>
+          </div>
+          <div class="bgroup-body">
+            <!-- Type pills -->
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+              ${groupNames.map(name => {
+                const short  = name.replace(' Cubes','').replace(' Cube','');
+                const active = name === sec.activeGroup;
+                return `<button
+                  class="cpill fig-type-pill${active ? ' active' : ''}"
+                  data-section="${sec.key}"
+                  data-group="${name}"
+                  onclick="app.ui.setFigureType('${sec.key}','${name}')">
+                  ${short}
+                </button>`;
+              }).join('')}
+            </div>
+            <!-- Color swatches -->
+            <div class="bgroup-swatches fig-swatches" data-section="${sec.key}">
+              ${swatchesHtml}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  _buildFigureSwatches(sec) {
+    return (sec.groups[sec.activeGroup] || []).map(item => `
+      <div class="bswatch${item.stock === 'out' ? ' out' : ''}"
+           onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
+           title="${item.name}"
+           style="width:34px;height:34px;border-radius:6px;">
+        <img src="${item.imgUrl}" alt="${item.name}" style="border-radius:4px;"/>
+        ${item.stock === 'low' ? '<span class="bswatch-low">!</span>' : ''}
+      </div>`).join('');
+  }
+
+  toggleFigureSection(key) {
+    const sec = (this._figureSections || []).find(s => s.key === key);
+    if (!sec) return;
+    sec.open = !sec.open;
+    const el = document.querySelector(`.bgroup[data-fig-key="${key}"]`);
+    if (el) el.classList.toggle('open', sec.open);
+  }
+
+  setFigureType(sectionKey, groupName) {
+    const sec = (this._figureSections || []).find(s => s.key === sectionKey);
+    if (!sec) return;
+    sec.activeGroup = groupName;
+
+    // Update pill active state using existing .cpill.active class
+    document.querySelectorAll(`.fig-type-pill[data-section="${sectionKey}"]`).forEach(b => {
+      b.classList.toggle('active', b.dataset.group === groupName);
     });
 
-    container.style.cssText = 'overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;padding:7px 8px;display:flex;flex-direction:column;gap:5px;';
-    container.innerHTML = Object.entries(groups).map(([groupName, items], idx) => `
-      <div class="bgroup${idx === 0 ? ' open' : ''}">
-        <div class="bgroup-head" onclick="this.closest('.bgroup').classList.toggle('open')">
-          <div class="bgroup-head-l">
-            <img class="bgroup-preview" src="${items[0].imgUrl}" alt="${groupName}"/>
-            <span class="bgroup-lbl">${groupName}</span>
-          </div>
-          <div class="bgroup-head-r">
-            <span class="bgroup-price">₱${items[0].price}</span>
-            <svg class="bgroup-arr" viewBox="0 0 10 10"><polyline points="2,3 5,7 8,3"/></svg>
-          </div>
-        </div>
-        <div class="bgroup-body">
-          <div class="bgroup-swatches">
-            ${items.map(item => `
-              <div class="bswatch${item.stock === 'out' ? ' out' : ''}"
-                   onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
-                   title="${item.name}">
-                <img src="${item.imgUrl}" alt="${item.name}"/>
-                ${item.stock === 'low' ? '<span class="bswatch-low">!</span>' : ''}
-              </div>`).join('')}
-          </div>
-        </div>
-      </div>`).join('');
+    // Re-render swatches
+    const swatchEl = document.querySelector(`.fig-swatches[data-section="${sectionKey}"]`);
+    if (swatchEl) swatchEl.innerHTML = this._buildFigureSwatches(sec);
   }
 
   // Charms tab — image-based series grouped in accordions
@@ -572,7 +646,7 @@ export class UIController {
 
   setActiveStrand(n, btnEl) {
     this.app.state.activeStrand = n;
-    this.app.render(); // triggers updateAll → renderDesignList which rebuilds selector + list
+    this.app.render();
   }
 
   setRingType(type, btnEl) {

@@ -97,13 +97,6 @@ export const FIGURES = [
   {id:'cc3', name:'Checker Mint',    shape:'cube-checker', color:'#90DDD9', detail:'#0A9690', price:14, stock:'in',  category:'figures', group:'Checker Cubes'},
   {id:'cc4', name:'Checker Lavender',shape:'cube-checker', color:'#C9A9F0', detail:'#5E35C8', price:14, stock:'low', category:'figures', group:'Checker Cubes'},
 
-  // ── Polka Dot Cubes ───────────────────────────────────────────────────────
-  {id:'pc1', name:'Dots Blush',    shape:'cube-dots', color:'#F9B8CF', detail:'#FFFFFF', price:12, stock:'in',  category:'figures', group:'Polka Dot Cubes'},
-  {id:'pc2', name:'Dots Mint',     shape:'cube-dots', color:'#90DDD9', detail:'#FFFFFF', price:12, stock:'in',  category:'figures', group:'Polka Dot Cubes'},
-  {id:'pc3', name:'Dots Lavender', shape:'cube-dots', color:'#C9A9F0', detail:'#FFFFFF', price:12, stock:'in',  category:'figures', group:'Polka Dot Cubes'},
-  {id:'pc4', name:'Dots Butter',   shape:'cube-dots', color:'#FFE07A', detail:'#3D3D52', price:12, stock:'in',  category:'figures', group:'Polka Dot Cubes'},
-  {id:'pc5', name:'Dots Black',    shape:'cube-dots', color:'#3D3D52', detail:'#F9B8CF', price:12, stock:'in',  category:'figures', group:'Polka Dot Cubes'},
-
   // ── Smiley Cubes ─────────────────────────────────────────────────────────
   {id:'sm1', name:'Smiley Blush',    shape:'cube-smile', color:'#F9B8CF', detail:'#3D3D52', price:13, stock:'in',  category:'figures', group:'Smiley Cubes'},
   {id:'sm2', name:'Smiley Mint',     shape:'cube-smile', color:'#90DDD9', detail:'#3D3D52', price:13, stock:'in',  category:'figures', group:'Smiley Cubes'},

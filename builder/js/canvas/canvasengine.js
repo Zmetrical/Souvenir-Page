@@ -1,3 +1,7 @@
+import { BeadShapes }      from './shapes/beads.js';
+import { CubeShapes }      from './shapes/cubes.js';
+import { drawImageElement } from './shapes/charms.js';
+
 export class CanvasEngine {
   constructor() {
     this.PATHS = {
@@ -17,7 +21,7 @@ export class CanvasEngine {
         if (this.imageCache.has(el.imgSrc)) { resolve(); return; }
         const img = new Image();
         img.onload  = () => { this.imageCache.set(el.imgSrc, img); this._bakeScaled(el.imgSrc, img); resolve(); };
-        img.onerror = () => { resolve(); };
+        img.onerror = () => resolve();
         img.src = el.imgSrc;
       }));
     return Promise.all(promises);
@@ -72,7 +76,6 @@ export class CanvasEngine {
     if (state.product === 'necklace') {
       const approxLen  = 800;
       const totalWidth = radii.reduce((s, r) => s + r * 2, 0);
-      // Start from LEFT of center, move right → index 0 = left, last = right
       let t = 0.5 - totalWidth / approxLen / 2;
       return elems.map((el, i) => {
         const { x, y, dx, dy } = this.bezierPoint(60, 80, 60, 420, 620, 420, 620, 80, t);
@@ -85,13 +88,10 @@ export class CanvasEngine {
     if (state.product === 'keychain') {
       const strandCount = state.keychainStrands || 1;
       const zoneTop = 195, zoneBot = 460, zoneH = zoneBot - zoneTop;
-
-      // X centre for each strand
       const spacing = 90;
       const totalW  = (strandCount - 1) * spacing;
       const strandX = Array.from({ length: strandCount }, (_, i) => 340 - totalW / 2 + i * spacing);
 
-      // Group element indices by their strand property
       const groups = {};
       for (let i = 0; i < count; i++) {
         const s = elems[i].strand ?? 0;
@@ -105,17 +105,12 @@ export class CanvasEngine {
       for (let s = 0; s < strandCount; s++) {
         const idxs = groups[s] || [];
         if (!idxs.length) continue;
-
         const sR      = idxs.map(i => radii[i]);
         const totalH  = sR.reduce((sum, r) => sum + r * 2, 0);
         const scale   = totalH > zoneH ? zoneH / totalH : 1;
         const scaledR = sR.map(r => r * scale);
-        const scaledH = scaledR.reduce((sum, r) => sum + r * 2, 0);
-
-        // Always start from top of zone, never center
         let y = zoneTop + scaledR[0];
         const x = strandX[s];
-
         idxs.forEach((elemIdx, j) => {
           positions[elemIdx] = { x, y, angle: 90 };
           scaleMap[elemIdx]  = scale;
@@ -153,7 +148,6 @@ export class CanvasEngine {
 
     const flat = state.view === 'flatlay';
 
-    // Pre-compute keychain strand X positions so guide lines are current
     if (state.product === 'keychain') {
       const n       = state.keychainStrands || 1;
       const spacing = 90;
@@ -181,7 +175,7 @@ export class CanvasEngine {
       for (let i = 0; i < state.elems.length; i++) {
         const el  = state.elems[i];
         const pos = positions[i] || { x: W / 2, y: H / 2, angle: 0 };
-        const baseR = el.useImg ? 8 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22;
+        const baseR  = el.useImg ? 8 : el.shape === 'ellipse' ? 28 : el.shape === 'tube' ? 14 : el.small ? 14 : el.large ? 28 : 22;
         const kScale = (state._keychainScales && state._keychainScales[i] != null) ? state._keychainScales[i] : 1;
         const R   = baseR * kScale;
         const sel = interactive && state.selectedId === el.uid;
@@ -194,7 +188,6 @@ export class CanvasEngine {
       }
     }
 
-    // Keychain connector ring + strand cords
     if (state.product === 'keychain' && !flat) {
       this.drawKeychainConnector(ctx, state);
     }
@@ -228,7 +221,6 @@ export class CanvasEngine {
     } else if (state.product === 'necklace') {
       ctx.beginPath(); ctx.moveTo(60, 80); ctx.bezierCurveTo(60, 420, 620, 420, 620, 80);
     } else {
-      // Keychain: one vertical line per strand
       const strandX = state._strandX || [340];
       strandX.forEach(x => {
         ctx.beginPath(); ctx.moveTo(x, 155); ctx.lineTo(x, 460);
@@ -237,12 +229,12 @@ export class CanvasEngine {
     }
   }
 
-  // ─── KEYCHAIN CONNECTOR (ring + cords) ─────────────────────────────────────
+  // ─── KEYCHAIN CONNECTOR ──────────────────────────────────────────────────────
   drawKeychainConnector(ctx, state) {
     const strandX   = state._strandX || [340];
     const ringType  = state.ringType  || 'ring';
-    const ringColor = state.ringColor || '#F7A8C8';   // connector colour
-    const cordColor = state.strColor  || '#F7A8C8';   // cord colour
+    const ringColor = state.ringColor || '#F7A8C8';
+    const cordColor = state.strColor  || '#F7A8C8';
     const ringCY    = 110;
 
     ctx.save();
@@ -251,9 +243,7 @@ export class CanvasEngine {
     ctx.lineCap     = 'round';
     ctx.lineJoin    = 'round';
 
-    // ── Draw the connector shape ──────────────────────────────────────────
     switch (ringType) {
-
       case 'heart': {
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -262,37 +252,30 @@ export class CanvasEngine {
         ctx.bezierCurveTo(hx + hs * 2, hy - hs * 1.2, hx + hs * 2.5, hy + hs * 0.8, hx, hy + hs * 2);
         ctx.bezierCurveTo(hx - hs * 2.5, hy + hs * 0.8, hx - hs * 2, hy - hs * 1.2, hx, hy + hs * 0.5);
         ctx.stroke();
-        ctx.strokeStyle = '#F8F7FA';
-        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#F8F7FA'; ctx.lineWidth = 6;
         ctx.beginPath();
         ctx.moveTo(hx - 7, hy + hs * 2 - 4);
         ctx.lineTo(hx + 7, hy + hs * 2 - 4);
         ctx.stroke();
         break;
       }
-
       case 'carabiner': {
         ctx.lineWidth = 5;
         ctx.beginPath();
         ctx.ellipse(340, ringCY + 10, 16, 28, 0, 0, Math.PI * 2);
         ctx.stroke();
         ctx.save();
-        ctx.strokeStyle = '#F8F7FA';
-        ctx.lineWidth   = 7;
+        ctx.strokeStyle = '#F8F7FA'; ctx.lineWidth = 7;
         ctx.beginPath();
-        ctx.moveTo(340, ringCY + 38 - 6);
-        ctx.lineTo(340, ringCY + 38 + 4);
+        ctx.moveTo(340, ringCY + 38 - 6); ctx.lineTo(340, ringCY + 38 + 4);
         ctx.stroke();
         ctx.restore();
-        ctx.strokeStyle = ringColor;
-        ctx.lineWidth   = 3;
+        ctx.strokeStyle = ringColor; ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.moveTo(332, ringCY + 38 - 2);
-        ctx.lineTo(340, ringCY + 34);
+        ctx.moveTo(332, ringCY + 38 - 2); ctx.lineTo(340, ringCY + 34);
         ctx.stroke();
         break;
       }
-
       case 'ballchain': {
         ctx.fillStyle = ringColor;
         const balls = 10, ballR = 4, loopR = 20;
@@ -304,8 +287,7 @@ export class CanvasEngine {
         }
         break;
       }
-
-      default: // 'ring'
+      default: // ring
         ctx.lineWidth = 5;
         ctx.beginPath();
         ctx.arc(340, ringCY + 8, 22, 0, Math.PI * 2);
@@ -313,27 +295,23 @@ export class CanvasEngine {
         break;
     }
 
-    // ── Cords — use cordColor ─────────────────────────────────────────────
+    // Cords
     ctx.strokeStyle = cordColor;
     const cordStartY = ringType === 'heart'     ? ringCY + 44 :
                        ringType === 'carabiner' ? ringCY + 40 :
                        ringType === 'ballchain' ? ringCY + 32 :
                                                   ringCY + 30;
-
     ctx.lineWidth = state.strType === 'Wire' ? 2 : 4;
     if (state.strType === 'Chain') ctx.setLineDash([5, 5]);
-
     strandX.forEach(x => {
       ctx.beginPath();
       ctx.moveTo(340, cordStartY);
       ctx.quadraticCurveTo(340, 185, x, 195);
       ctx.stroke();
     });
-
     ctx.setLineDash([]);
     ctx.restore();
   }
-
 
   drawClasp(ctx, product, clasp, color) {
     if (clasp === 'none') return;
@@ -343,94 +321,55 @@ export class CanvasEngine {
       ctx.translate(150, 170); ctx.rotate(-0.3);
       ctx.beginPath(); this.roundRect(ctx, -8, -8, 16, 16, 4); ctx.fill();
     } else if (product === 'necklace') {
-      [[60,80],[620,80]].forEach(([x,y]) => { ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI*2); ctx.fill(); });
+      [[60, 80], [620, 80]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill(); });
     } else {
-      ctx.beginPath(); ctx.arc(340, 172, 8, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(340, 172, 8, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
 
-  outlineFill(ctx, pathFunc, color, R) {
-    ctx.fillStyle = color;
-    ctx.beginPath(); pathFunc(ctx, R); ctx.fill();
-  }
-
-  drawSelectionGlow(ctx, R) {
-    ctx.save();
-    ctx.strokeStyle = '#F7A8C8';
-    ctx.lineWidth   = 3;
-    ctx.beginPath(); ctx.arc(0, 0, R + 5, 0, Math.PI * 2); ctx.stroke();
-    ctx.restore();
-  }
-
-  drawImageElement(ctx, el, R, isSelected) {
-    const source = this.scaledCache.get(el.imgSrc) || this.imageCache.get(el.imgSrc);
-    const D = 100;
-
-    if (!source) {
-      ctx.fillStyle = '#F7A8C8'; ctx.font = 'bold 20px sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('✿', -10, 0);
+  // ─── ELEMENT DISPATCH ────────────────────────────────────────────────────────
+  drawElement(ctx, el, R, isSelected, isThumb = false, posAngle = 0) {
+    // ── Image-based charms ────────────────────────────────────────────────────
+    if (el.useImg) {
+      drawImageElement(ctx, el, R, isSelected && !isThumb, this.imageCache, this.scaledCache);
       return;
     }
 
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    const tf = ctx.getTransform();
-    ctx.rotate(-Math.atan2(tf.b, tf.a));
-
-    const ringR  = 8;
-    const figTop = ringR;
-
-    ctx.save();
-
-    if (isSelected) {
+    // ── Selection glow ────────────────────────────────────────────────────────
+    if (isSelected && !isThumb) {
+      ctx.save();
       ctx.strokeStyle = '#F7A8C8';
-      ctx.lineWidth   = 2;
-      ctx.setLineDash([3, 2]);
-      ctx.beginPath(); ctx.arc(0, 0, ringR + 4, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.lineWidth   = 3;
+      ctx.beginPath(); ctx.arc(0, 0, R + 5, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
     }
-
-    ctx.strokeStyle = '#F7A8C8';
-    ctx.lineWidth   = 2.5;
-    ctx.beginPath(); ctx.arc(0, 0, ringR, 0, Math.PI * 2); ctx.stroke();
-
-    ctx.drawImage(source, -D/2, figTop, D, D);
-
-    ctx.restore();
-  }
-
-  drawElement(ctx, el, R, isSelected, isThumb = false, posAngle = 0) {
-    if (el.useImg) { this.drawImageElement(ctx, el, R, isSelected && !isThumb); return; }
-
-    if (isSelected && !isThumb) this.drawSelectionGlow(ctx, R);
 
     const color  = el.color  || '#FFFFFF';
     const detail = el.detail || '#FFFFFF';
 
     // ── Cube family ───────────────────────────────────────────────────────────
     if (el.shape && el.shape.startsWith('cube')) {
-      // Un-rotate so cube face is always upright
       ctx.save();
-      ctx.rotate(-posAngle * Math.PI / 180);
-      this.drawCubeShape(ctx, el, R);
+      ctx.rotate(-posAngle * Math.PI / 180); // un-rotate so face stays upright
+      const drawFn = CubeShapes[el.shape];
+      if (drawFn) drawFn(ctx, R, color, detail, this.roundRect.bind(this));
       ctx.restore();
       return;
     }
 
+    // ── Letter tiles ──────────────────────────────────────────────────────────
     if (el.isLetter) {
       const bg = el.ltrBg   || '#FFFFFF';
       const fg = el.ltrText || '#333344';
-
       if (el.letterShape === 'square') {
         const s = R * 1.85;
         ctx.fillStyle = bg;
-        ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s * 0.22); ctx.fill();
+        ctx.beginPath(); this.roundRect(ctx, -s / 2, -s / 2, s, s, s * 0.22); ctx.fill();
       } else {
-        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), bg, R);
+        ctx.fillStyle = bg;
+        ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
       }
-
       ctx.save();
       ctx.rotate(-posAngle * Math.PI / 180);
       ctx.fillStyle = fg;
@@ -441,273 +380,37 @@ export class CanvasEngine {
       return;
     }
 
-    switch (el.shape) {
-
-      case 'round':
-        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R);
-        break;
-
-      case 'ellipse':
-        this.outlineFill(ctx, (c, r) => c.ellipse(0, 0, r*1.55, r*0.78, 0, 0, Math.PI*2), color, R);
-        break;
-
-      case 'tube':
-        this.outlineFill(ctx, (c, r) => c.ellipse(0, 0, r*0.7, r*1.58, 0, 0, Math.PI*2), color, R);
-        break;
-
-      case 'pearl':
-        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI * 2), color, R);
-        break;
-
-      case 'faceted':
-        this.outlineFill(ctx, (c, r) => {
-          c.beginPath();
-          for (let i = 0; i < 6; i++) c.lineTo(Math.cos(i*Math.PI/3)*r, Math.sin(i*Math.PI/3)*r);
-          c.closePath();
-        }, color, R);
-        break;
-
-      case 'heart':
-        this.outlineFill(ctx, (c, r) => {
-          c.moveTo(0, r*0.3);
-          c.bezierCurveTo( r, -r*1.2,  r*2.2, r*0.4, 0,  r);
-          c.bezierCurveTo(-r*2.2, r*0.4, -r, -r*1.2, 0, r*0.3);
-        }, color, R);
-        break;
-
-      case 'star':
-        this.outlineFill(ctx, (c, r) => {
-          c.beginPath();
-          for (let i = 0; i < 10; i++) {
-            const rad = i % 2 === 0 ? r : r * 0.44;
-            c.lineTo(Math.cos(i*Math.PI/5 - Math.PI/2)*rad, Math.sin(i*Math.PI/5 - Math.PI/2)*rad);
-          }
-          c.closePath();
-        }, color, R);
-        break;
-
-      case 'moon':
-        this.outlineFill(ctx, (c, r) => {
-          c.arc(0, 0, r, Math.PI*0.15, Math.PI*1.85, true);
-          c.quadraticCurveTo(-r*0.4, 0, Math.cos(Math.PI*0.15)*r, Math.sin(Math.PI*0.15)*r);
-        }, color, R);
-        break;
-
-      case 'flower':
-        for (let i = 0; i < 5; i++) {
-          const a = i * Math.PI * 2 / 5;
-          ctx.save();
-          ctx.translate(Math.cos(a)*R*0.56, Math.sin(a)*R*0.56);
-          this.outlineFill(ctx, (c, r) => c.arc(0, 0, r*0.48, 0, Math.PI*2), color, R);
-          ctx.restore();
-        }
-        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r*0.34, 0, Math.PI*2), detail, R);
-        break;
-
-      case 'rainbow': {
-        const stripes = ['#FFB3C6','#FFCF8B','#FFF4A3','#B5EDCA','#B3D9FF','#D9C0F5'];
-        stripes.forEach((col, idx) => {
-          const oR = R * (1 - idx * 0.12);
-          const iR = oR - R * 0.10;
-          ctx.fillStyle = col;
-          ctx.beginPath();
-          ctx.arc(0, R*0.15, oR, Math.PI, 0);
-          ctx.arc(0, R*0.15, iR, 0, Math.PI, true);
-          ctx.closePath(); ctx.fill();
-        });
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(0, R*0.15, R*0.20, Math.PI, 0);
-        ctx.arc(0, R*0.35, R*0.32, 0, Math.PI);
-        ctx.closePath(); ctx.fill();
-        break;
-      }
-
-      case 'bow': {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(0,0); ctx.bezierCurveTo(-R*1.4,-R*0.9,-R*1.6,R*0.4,-R*0.2,R*0.15); ctx.closePath(); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(0,0); ctx.bezierCurveTo( R*1.4,-R*0.9, R*1.6,R*0.4, R*0.2,R*0.15); ctx.closePath(); ctx.fill();
-        this.outlineFill(ctx, (c,r) => c.arc(0, R*0.06, r*0.3, 0, Math.PI*2), detail, R);
-        break;
-      }
-
-      case 'butterfly': {
-        ctx.fillStyle = color;
-        ctx.beginPath(); ctx.ellipse(-R*.7,-R*.32,R*.7,R*.52,-0.4,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse( R*.7,-R*.32,R*.7,R*.52, 0.4,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle = this._lighten(color, 0.18);
-        ctx.beginPath(); ctx.ellipse(-R*.52, R*.3,R*.48,R*.36,0.3,0,Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse( R*.52, R*.3,R*.48,R*.36,-0.3,0,Math.PI*2); ctx.fill();
-        this.outlineFill(ctx, (c,r) => c.ellipse(0, 0, r*0.17, r*0.78, 0, 0, Math.PI*2), detail, R);
-        break;
-      }
-
-      default:
-        this.outlineFill(ctx, (c, r) => c.arc(0, 0, r, 0, Math.PI*2), color, R);
+    // ── Standard bead shapes ──────────────────────────────────────────────────
+    const drawFn = BeadShapes[el.shape];
+    if (drawFn) {
+      drawFn(ctx, R, color, detail, this._lighten.bind(this));
+    } else {
+      // Fallback — plain circle
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  // ─── CUBE HELPER ────────────────────────────────────────────────────────────
-  _drawCubeBase(ctx, R, color) {
-    const s = R * 1.8;
-    ctx.fillStyle = color;
-    ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s * 0.18); ctx.fill();
-  }
-
-  _drawCubeDot(ctx, x, y, r, color) {
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-  }
-
-  drawCubeShape(ctx, el, R) {
-    const color  = el.color  || '#F9B8CF';
-    const detail = el.detail || '#FFFFFF';
-    const s      = R * 1.8;
-    const h      = s / 2;
-    const dr     = R * 0.18; // dot radius
-
-    switch (el.shape) {
-
-      // ── Plain cube ─────────────────────────────────────────────────────────
-      case 'cube':
-        this._drawCubeBase(ctx, R, color);
-        break;
-
-      // ── Dice — classic pip layout ──────────────────────────────────────────
-      case 'cube-dice1':
-        this._drawCubeBase(ctx, R, color);
-        this._drawCubeDot(ctx, 0, 0, dr, detail);
-        break;
-
-      case 'cube-dice2':
-        this._drawCubeBase(ctx, R, color);
-        this._drawCubeDot(ctx, -h*0.42,  h*0.42, dr, detail);
-        this._drawCubeDot(ctx,  h*0.42, -h*0.42, dr, detail);
-        break;
-
-      case 'cube-dice3':
-        this._drawCubeBase(ctx, R, color);
-        this._drawCubeDot(ctx, -h*0.42,  h*0.42, dr, detail);
-        this._drawCubeDot(ctx,  0,        0,      dr, detail);
-        this._drawCubeDot(ctx,  h*0.42, -h*0.42, dr, detail);
-        break;
-
-      case 'cube-dice4':
-        this._drawCubeBase(ctx, R, color);
-        [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([dx,dy]) =>
-          this._drawCubeDot(ctx, dx*h*0.38, dy*h*0.38, dr, detail));
-        break;
-
-      case 'cube-dice5':
-        this._drawCubeBase(ctx, R, color);
-        [[-1,-1],[1,-1],[-1,1],[1,1],[0,0]].forEach(([dx,dy]) =>
-          this._drawCubeDot(ctx, dx*h*0.38, dy*h*0.38, dr, detail));
-        break;
-
-      case 'cube-dice6':
-        this._drawCubeBase(ctx, R, color);
-        [[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]].forEach(([dx,dy]) =>
-          this._drawCubeDot(ctx, dx*h*0.38, dy*h*0.38, dr, detail));
-        break;
-
-      // ── Heart print cube ───────────────────────────────────────────────────
-      case 'cube-heart': {
-        this._drawCubeBase(ctx, R, color);
-        const hr = R * 0.55;
-        ctx.fillStyle = detail;
-        ctx.beginPath();
-        ctx.moveTo(0, hr*0.3);
-        ctx.bezierCurveTo( hr, -hr*1.2,  hr*2.2, hr*0.4, 0,  hr);
-        ctx.bezierCurveTo(-hr*2.2, hr*0.4, -hr, -hr*1.2, 0, hr*0.3);
-        ctx.fill();
-        break;
-      }
-
-      // ── Star print cube ────────────────────────────────────────────────────
-      case 'cube-star': {
-        this._drawCubeBase(ctx, R, color);
-        const sr = R * 0.6;
-        ctx.fillStyle = detail;
-        ctx.beginPath();
-        for (let i = 0; i < 10; i++) {
-          const rad = i % 2 === 0 ? sr : sr * 0.44;
-          ctx.lineTo(Math.cos(i*Math.PI/5 - Math.PI/2)*rad, Math.sin(i*Math.PI/5 - Math.PI/2)*rad);
-        }
-        ctx.closePath(); ctx.fill();
-        break;
-      }
-
-      // ── Checkered cube ─────────────────────────────────────────────────────
-      case 'cube-checker': {
-        this._drawCubeBase(ctx, R, color);
-        const cs = s / 4;
-        ctx.fillStyle = detail;
-        // clip to cube shape
-        ctx.save();
-        ctx.beginPath(); this.roundRect(ctx, -s/2, -s/2, s, s, s*0.18); ctx.clip();
-        for (let row = 0; row < 4; row++) {
-          for (let col = 0; col < 4; col++) {
-            if ((row + col) % 2 === 0) {
-              ctx.fillRect(-s/2 + col*cs, -s/2 + row*cs, cs, cs);
-            }
-          }
-        }
-        ctx.restore();
-        break;
-      }
-
-      // ── Polka dot cube ─────────────────────────────────────────────────────
-      case 'cube-dots': {
-        this._drawCubeBase(ctx, R, color);
-        const positions = [
-          [-0.38,-0.38],[0.38,-0.38],[0,-0.06],
-          [-0.38, 0.38],[0.38, 0.38],
-        ];
-        positions.forEach(([dx,dy]) =>
-          this._drawCubeDot(ctx, dx*s, dy*s, R*0.14, detail));
-        break;
-      }
-
-      // ── Smiley cube ────────────────────────────────────────────────────────
-      case 'cube-smile': {
-        this._drawCubeBase(ctx, R, color);
-        ctx.strokeStyle = detail; ctx.lineWidth = R * 0.14; ctx.lineCap = 'round';
-        // Eyes
-        ctx.fillStyle = detail;
-        this._drawCubeDot(ctx, -R*0.35, -R*0.2, R*0.13, detail);
-        this._drawCubeDot(ctx,  R*0.35, -R*0.2, R*0.13, detail);
-        // Smile
-        ctx.beginPath();
-        ctx.arc(0, R*0.1, R*0.38, 0.2, Math.PI - 0.2);
-        ctx.stroke();
-        break;
-      }
-
-      default:
-        this._drawCubeBase(ctx, R, color);
-    }
-  }
-
+  // ─── UTILITIES ───────────────────────────────────────────────────────────────
   roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
-    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
   }
 
   _lighten(hex, a) { return this._adj(hex,  a); }
   _darken (hex, a) { return this._adj(hex, -a); }
   _adj(hex, a) {
     try {
-      const n = parseInt(hex.replace('#',''), 16);
-      const c = v => Math.min(255, Math.max(0, v + Math.round(255*a)));
-      return `rgb(${c(n>>16)},${c((n>>8)&0xff)},${c(n&0xff)})`;
+      const n = parseInt(hex.replace('#', ''), 16);
+      const c = v => Math.min(255, Math.max(0, v + Math.round(255 * a)));
+      return `rgb(${c(n >> 16)},${c((n >> 8) & 0xff)},${c(n & 0xff)})`;
     } catch { return hex; }
   }
 
+  // ─── THUMBNAIL GENERATORS ────────────────────────────────────────────────────
   generateThumbnails(arr) {
     const c = document.createElement('canvas');
     c.width = c.height = 100;

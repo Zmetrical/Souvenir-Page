@@ -1,5 +1,5 @@
 <div class="rpanel">
-  <div class="rhead">( Element Library )</div>
+  <div class="rhead">Element Library </div>
 
   <div class="dir-toggle">
     <span class="dir-lbl">Insert At:</span>
@@ -53,13 +53,13 @@
     <div class="lclr">
       <div class="slbl" style="margin:0;font-size:.65rem;white-space:nowrap;">Color</div>
       <div class="swatches" id="ltr-sw">
-        <div class="sw active" style="background:#fff;"    onclick="app.ui.setLtrCol('#ffffff','#333344',this)"></div>
-        <div class="sw"        style="background:#F9B8CF;" onclick="app.ui.setLtrCol('#F9B8CF','#C06080',this)"></div>
-        <div class="sw"        style="background:#90DDD9;" onclick="app.ui.setLtrCol('#90DDD9','#3A8884',this)"></div>
-        <div class="sw"        style="background:#C9A9F0;" onclick="app.ui.setLtrCol('#C9A9F0','#6040A0',this)"></div>
-        <div class="sw"        style="background:#CCE86A;" onclick="app.ui.setLtrCol('#CCE86A','#6A9020',this)"></div>
-        <div class="sw"        style="background:#FFE07A;" onclick="app.ui.setLtrCol('#FFE07A','#A07010',this)"></div>
-        <div class="sw"        style="background:#3D3D52;" onclick="app.ui.setLtrCol('#3D3D52','#ffffff',this)"></div>
+<div class="sw active" style="background:#fff;"    onclick="app.ui.setLtrCol('#ffffff','#333344',this)"></div>
+<div class="sw"        style="background:#F9B8CF;" onclick="app.ui.setLtrCol('#F9B8CF','#ffffff',this)"></div>
+<div class="sw"        style="background:#90DDD9;" onclick="app.ui.setLtrCol('#90DDD9','#ffffff',this)"></div>
+<div class="sw"        style="background:#C9A9F0;" onclick="app.ui.setLtrCol('#C9A9F0','#ffffff',this)"></div>
+<div class="sw"        style="background:#CCE86A;" onclick="app.ui.setLtrCol('#CCE86A','#ffffff',this)"></div>
+<div class="sw"        style="background:#FFE07A;" onclick="app.ui.setLtrCol('#FFE07A','#ffffff',this)"></div>
+<div class="sw"        style="background:#3D3D52;" onclick="app.ui.setLtrCol('#3D3D52','#ffffff',this)"></div>
       </div>
     </div>
     <div class="lgrid-ltrs" id="grid-ltrs"></div>
