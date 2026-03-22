@@ -75,12 +75,12 @@ export const CHARMS = [
   // Rainbow
   {id:'c12',name:'Rainbow',       shape:'rainbow',   color:'#FF8FAD',            price:20, stock:'in',  category:'charms'},
 
-  // Bows (new)
+  // Bows
   {id:'c13',name:'Bow Blush',     shape:'bow',       color:'#F9B8CF', detail:'#FFFFFF', price:18, stock:'in',  category:'charms'},
   {id:'c14',name:'Bow Lavender',  shape:'bow',       color:'#C9A9F0', detail:'#FFFFFF', price:18, stock:'in',  category:'charms'},
   {id:'c15',name:'Bow Red',       shape:'bow',       color:'#FF8FAD', detail:'#FFE4EE', price:18, stock:'low', category:'charms'},
 
-  // Butterflies (new)
+  // Butterflies
   {id:'c16',name:'Butterfly Pink',  shape:'butterfly', color:'#F9B8CF', detail:'#3D3D52', price:20, stock:'in',  category:'charms'},
   {id:'c17',name:'Butterfly Blue',  shape:'butterfly', color:'#9DD4F7', detail:'#3D3D52', price:20, stock:'in',  category:'charms'},
   {id:'c18',name:'Butterfly Purple',shape:'butterfly', color:'#C9A9F0', detail:'#3D3D52', price:20, stock:'low', category:'charms'},
@@ -88,11 +88,21 @@ export const CHARMS = [
 
 // ─── FIGURES (real images) ───────────────────────────────────────────────────
 export const FIGURES = [
-  {id:'fg1', name:'Hello Kitty 1', useImg:true, imgSrc:'./img/hello kitty/01.png', price:35, stock:'in',  category:'figures', large:true},
-  {id:'fg2', name:'Hello Kitty 2', useImg:true, imgSrc:'./img/hello kitty/02.png', price:35, stock:'in',  category:'figures', large:true},
-  {id:'fg3', name:'Hello Kitty 3', useImg:true, imgSrc:'./img/hello kitty/03.png', price:35, stock:'in',  category:'figures', large:true},
-  {id:'fg4', name:'Hello Kitty 4', useImg:true, imgSrc:'./img/hello kitty/04.png', price:35, stock:'low', category:'figures', large:true},
-  {id:'fg5', name:'Hello Kitty 5', useImg:true, imgSrc:'./img/hello kitty/05.png', price:35, stock:'in',  category:'figures', large:true},
+  // ── Hello Kitty ────────────────────────────────────────────────────────────
+  {id:'fg1', name:'Hello Kitty 1', useImg:true, imgSrc:'./img/hello kitty/01.png', price:35, stock:'in',  category:'figures', large:true, series:'Hello Kitty'},
+  {id:'fg2', name:'Hello Kitty 2', useImg:true, imgSrc:'./img/hello kitty/02.png', price:35, stock:'in',  category:'figures', large:true, series:'Hello Kitty'},
+  {id:'fg3', name:'Hello Kitty 3', useImg:true, imgSrc:'./img/hello kitty/03.png', price:35, stock:'in',  category:'figures', large:true, series:'Hello Kitty'},
+  {id:'fg4', name:'Hello Kitty 4', useImg:true, imgSrc:'./img/hello kitty/04.png', price:35, stock:'low', category:'figures', large:true, series:'Hello Kitty'},
+  {id:'fg5', name:'Hello Kitty 5', useImg:true, imgSrc:'./img/hello kitty/05.png', price:35, stock:'in',  category:'figures', large:true, series:'Hello Kitty'},
+
+  // ── BTS ────────────────────────────────────────────────────────────────────
+  {id:'bts1', name:'BTS RM',     useImg:true, imgSrc:'./img/bts/1.png', price:40, stock:'in',  category:'figures', large:true, series:'BTS'},
+  {id:'bts2', name:'BTS Jin',    useImg:true, imgSrc:'./img/bts/2.png', price:40, stock:'in',  category:'figures', large:true, series:'BTS'},
+  {id:'bts3', name:'BTS Suga',   useImg:true, imgSrc:'./img/bts/3.png', price:40, stock:'in',  category:'figures', large:true, series:'BTS'},
+  {id:'bts4', name:'BTS J-Hope', useImg:true, imgSrc:'./img/bts/4.png', price:40, stock:'in',  category:'figures', large:true, series:'BTS'},
+  {id:'bts5', name:'BTS Jimin',  useImg:true, imgSrc:'./img/bts/5.png', price:40, stock:'in',  category:'figures', large:true, series:'BTS'},
+  {id:'bts6', name:'BTS V',      useImg:true, imgSrc:'./img/bts/6.png', price:40, stock:'in',  category:'figures', large:true, series:'BTS'},
+  {id:'bts7', name:'BTS Jungkook',useImg:true,imgSrc:'./img/bts/7.png', price:40, stock:'in',  category:'figures', large:true, series:'BTS'},
 ];
 
 export const ELEM_MAP = {};

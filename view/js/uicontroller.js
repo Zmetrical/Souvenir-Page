@@ -28,7 +28,6 @@ export class UIController {
 
   handleDragStart(e, canvas) {
     const rect = canvas.getBoundingClientRect();
-    // Use CSS pixel space (rect.width = 680) — NOT canvas.width (which is DPR-scaled)
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
 
@@ -43,8 +42,7 @@ export class UIController {
       const el  = state.elems[i];
       let hx, hy, R;
       if (el.useImg) {
-        // Only the jump ring (at string point y=0) is selectable — not the body
-        hx = pos.x; hy = pos.y; R = 14; // ring r=8 + 6px click margin
+        hx = pos.x; hy = pos.y; R = 14;
       } else {
         hx = pos.x; hy = pos.y; R = (el.small ? 14 : el.large ? 28 : 22) + 6;
       }
@@ -114,9 +112,11 @@ export class UIController {
   updateCounters() {
     const state = this.app.state;
     const ec = state.elems.reduce((s, e) => s + (e.price || 8), 0);
-    document.getElementById('bead-ct').textContent = state.elems.length;
-    document.getElementById('bead-max').textContent = state.maxBeads;
-    document.getElementById('price-disp').textContent = `₱${state.basePrice + ec}`;
+    const beadCt  = document.getElementById('bead-ct');
+    const beadMax = document.getElementById('bead-max');
+    if (beadCt)  beadCt.textContent  = state.elems.length;
+    if (beadMax) beadMax.textContent = state.maxBeads;
+    if (priceDisp) priceDisp.textContent = `₱${state.basePrice + ec}`;
     const emptyOver = document.getElementById('empty-over');
     if (emptyOver) emptyOver.style.display = state.elems.length ? 'none' : 'flex';
   }
@@ -219,12 +219,10 @@ export class UIController {
   renderDesignList() {
     const state = this.app.state;
     const list = document.getElementById('design-list');
-    const foot = document.getElementById('design-foot');
     document.getElementById('elem-count-badge').textContent = state.elems.length;
 
     if (!state.elems.length) {
       list.innerHTML = `<div class="dempty"><div class="dempty-icon">✽</div>No elements yet.<br>Pick from the library →</div>`;
-      foot.style.display = 'none';
       return;
     }
 
@@ -240,27 +238,57 @@ export class UIController {
           <button class="di-btn del" onclick="event.stopPropagation(); app.ui.removeBead('${el.uid}')">×</button>
         </div>
       </div>`).join('');
-
-    const ec = state.elems.reduce((s, e) => s + (e.price || 8), 0);
-    foot.style.display = 'block';
-    foot.innerHTML = `
-      <div class="dfoot-row"><span>${state.elems.length} elements</span><span>₱${ec}</span></div>
-      <div class="dfoot-row"><span>Base (${state.product})</span><span>₱${state.basePrice}</span></div>
-      <div class="dfoot-total"><span>Total Est.</span><span style="color:var(--ink)">₱${state.basePrice + ec}</span></div>`;
   }
 
-  // ─── UPDATED buildGrid ───────────────────────────────────────────────────────
-  // isFigure = true → adds class="figure" to the card so CSS targets it
   buildGrid(gridId, items, isFigure = false) {
-    document.getElementById(gridId).innerHTML = items.map(item => `
-      <div class="ecard${isFigure ? ' figure' : ''}${item.stock === 'out' ? ' out' : ''}"
-           onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
-           title="${item.name}">
-        <div class="eprev-img">
-          <img src="${item.imgUrl}" alt="${item.name}"/>
+    const container = document.getElementById(gridId);
+    if (!isFigure) {
+      container.innerHTML = items.map(item => `
+        <div class="ecard${item.stock === 'out' ? ' out' : ''}"
+             onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
+             title="${item.name}">
+          <div class="eprev-img"><img src="${item.imgUrl}" alt="${item.name}"/></div>
+          <div class="ename">${item.name}</div>
+          <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
+        </div>`).join('');
+      return;
+    }
+
+    // Figures: group by series → collapsible accordion per series
+    const groups = {};
+    items.forEach(item => {
+      const g = item.series || 'Other';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(item);
+    });
+
+    container.style.cssText = 'overflow-y:auto;flex:1;padding:8px;display:flex;flex-direction:column;gap:8px;background:var(--off)';
+    container.innerHTML = Object.entries(groups).map(([seriesName, figs], idx) => `
+      <div class="bgroup${idx === 0 ? ' open' : ''}">
+        <div class="bgroup-head" onclick="this.closest('.bgroup').classList.toggle('open')">
+          <div class="bgroup-head-l">
+            <img class="bgroup-preview" src="${figs[0].imgUrl}" alt="${seriesName}" style="border-radius:6px;"/>
+            <span class="bgroup-lbl">${seriesName}</span>
+          </div>
+          <div class="bgroup-head-r">
+            <span class="bgroup-price">₱${figs[0].price}</span>
+            <svg class="bgroup-arr" viewBox="0 0 10 10"><polyline points="2,3 5,7 8,3"/></svg>
+          </div>
         </div>
-        <div class="ename">${item.name}</div>
-        <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
+        <div class="bgroup-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            ${figs.map(item => `
+              <div class="ecard figure${item.stock === 'out' ? ' out' : ''}"
+                   onclick="${item.stock !== 'out' ? `app.ui.addElement('${item.id}')` : ''}"
+                   title="${item.name}">
+                <div class="eprev-img" style="width:64px;height:64px;">
+                  <img src="${item.imgUrl}" alt="${item.name}"/>
+                </div>
+                <div class="ename">${item.name}</div>
+                <span class="sbd s-${item.stock}">${item.stock === 'in' ? '✓ In' : item.stock === 'low' ? 'Low' : 'Out'}</span>
+              </div>`).join('')}
+          </div>
+        </div>
       </div>`).join('');
   }
 
@@ -303,7 +331,6 @@ export class UIController {
 
   buildLetters() {
     const state = this.app.state;
-    // Square or round letter style toggle
     const isSquare = state.letterShape === 'square';
     document.getElementById('grid-ltrs').innerHTML = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'].map(ch => `
       <div class="lbtn" onclick="app.ui.addLetter('${ch}')"
@@ -345,6 +372,7 @@ export class UIController {
     this.app.state.maxBeads = +el.dataset.max;
     document.querySelectorAll('.tpill').forEach(p => p.classList.remove('active'));
     el.classList.add('active');
+    this.updateCounters();
     this.app.render();
   }
   setStrCol(col, el) {
@@ -403,17 +431,6 @@ export class UIController {
     this.app.state.selectedId = null;
     this.app.canvasEngine.draw(targetCanvas, this.app.state, false);
     this.app.state.selectedId = previousSelection;
-  }
-
-  exportDesign() {
-    if (!this.app.state.elems.length) { this.showToast('Add some elements first!'); return; }
-    const ec = document.createElement('canvas');
-    this.renderToCanvas(ec, 680, 480);
-    const link = document.createElement('a');
-    link.download = `artsycrate-design-${Date.now()}.png`;
-    link.href = ec.toDataURL('image/png');
-    link.click();
-    this.showToast('Design exported!');
   }
 
   downloadDesign() {
